@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="jsonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGradient)"/>
+  
+  <!-- JSON Brackets -->
+  <g transform="translate(64, 64)">
+    <!-- Left curly brace -->
+    <path d="M -30 -25 C -35 -25, -35 -20, -35 -15 L -35 -5 C -35 0, -40 0, -45 0 C -40 0, -35 0, -35 5 L -35 15 C -35 20, -35 25, -30 25" 
+          stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+    
+    <!-- Right curly brace -->
+    <path d="M 30 -25 C 35 -25, 35 -20, 35 -15 L 35 -5 C 35 0, 40 0, 45 0 C 40 0, 35 0, 35 5 L 35 15 C 35 20, 35 25, 30 25" 
+          stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+    
+    <!-- JSON dots/nodes representing structure -->
+    <circle cx="-15" cy="-12" r="3" fill="url(#jsonGradient)"/>
+    <circle cx="0" cy="-12" r="3" fill="white"/>
+    <circle cx="15" cy="-12" r="3" fill="url(#jsonGradient)"/>
+    
+    <circle cx="-15" cy="0" r="3" fill="white"/>
+    <circle cx="0" cy="0" r="3" fill="url(#jsonGradient)"/>
+    <circle cx="15" cy="0" r="3" fill="white"/>
+    
+    <circle cx="-15" cy="12" r="3" fill="url(#jsonGradient)"/>
+    <circle cx="0" cy="12" r="3" fill="white"/>
+    <circle cx="15" cy="12" r="3" fill="url(#jsonGradient)"/>
+    
+    <!-- Connecting lines to represent tree structure -->
+    <line x1="-15" y1="-12" x2="0" y2="0" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <line x1="0" y1="0" x2="15" y2="-12" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <line x1="0" y1="0" x2="-15" y2="12" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <line x1="0" y1="0" x2="15" y2="12" stroke="white" stroke-width="1.5" opacity="0.5"/>
+  </g>
+</svg>
