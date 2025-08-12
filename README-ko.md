@@ -1,8 +1,12 @@
-# PDJSONEditor
+# PDJsonEditor
 
 *[English](README.md)*
 
 SvelteKit과 Svelte 5로 구축된 강력한 JSON 시각화 및 편집 도구입니다. JSON 데이터를 코드 에디터와 인터랙티브 그래프 뷰에서 동시에 보고 편집할 수 있습니다.
+
+🔗 **[라이브 데모](https://json.podosoft.io)**
+
+![PDJsonEditor 스크린샷](screenshots/pdjsoneditor.png)
 
 ## ✨ 주요 기능
 
