@@ -7,6 +7,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import * as Resizable from '$lib/components/ui/resizable/index.js';
 	import {
 		FileCode2,
@@ -19,11 +20,14 @@
 		Check,
 		Settings2,
 		Plus,
-		Trash2
+		Trash2,
+		X,
+		Copy
 	} from 'lucide-svelte';
 	import { mode, toggleMode } from 'mode-watcher';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import LL from '$i18n/i18n-svelte';
+	import { toast } from 'svelte-sonner';
 	import type { JsonValue } from '$lib/types/json';
 
 	// 	let jsonValue = $state(`{
@@ -90,29 +94,147 @@
 	let error = $state<string>('');
 	let editorRef: JsonEditor;
 	let parseTimeout: ReturnType<typeof setTimeout>;
+
+	// LocalStorage keys
+	const STORAGE_KEYS = {
+		URL: 'pdjsoneditor_url',
+		METHOD: 'pdjsoneditor_method',
+		HEADERS: 'pdjsoneditor_headers',
+		BODY: 'pdjsoneditor_body',
+		RAW_BODY_MODE: 'pdjsoneditor_raw_body_mode',
+		USE_EDITOR_CONTENT: 'pdjsoneditor_use_editor_content'
+	};
+
+	// Initialize with empty values (will be populated from localStorage in onMount)
 	let urlInput = $state<string>('https://jsonplaceholder.typicode.com/todos/1');
 	let isLoading = $state<boolean>(false);
 	let httpMethod = $state<string>('GET');
 	let isDialogOpen = $state<boolean>(false);
-	let customHeaders = $state<Array<{ key: string; value: string }>>([
-		{ key: 'Content-Type', value: 'application/json' }
-	]);
+	let customHeaders = $state<Array<{ key: string; value: string }>>([]);
+	let tempHeaders = $state<Array<{ key: string; value: string }>>([]);
 	let customBody = $state<string>('');
+	let tempBody = $state<string>('');
+	let sendAsRawText = $state<boolean>(false);
+	let tempSendAsRawText = $state<boolean>(false);
+	let useEditorContent = $state<boolean>(false);
+	let tempUseEditorContent = $state<boolean>(false);
+	let httpStatusCode = $state<number | null>(null);
+	let responseTime = $state<number | null>(null);
 
 	const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
 
+	function openSettingsDialog() {
+		// Copy current headers to temp, ensure it's a proper array
+		if (customHeaders && customHeaders.length > 0) {
+			tempHeaders = customHeaders.map((h) => ({ ...h }));
+		} else {
+			tempHeaders = [{ key: '', value: '' }];
+		}
+		tempBody = customBody || '';
+		tempSendAsRawText = sendAsRawText;
+		tempUseEditorContent = useEditorContent;
+		isDialogOpen = true;
+	}
+
+	function saveSettings() {
+		// Save temp to actual
+		customHeaders = [...tempHeaders];
+		customBody = tempBody;
+		sendAsRawText = tempSendAsRawText;
+		useEditorContent = tempUseEditorContent;
+
+		// Save to localStorage
+		localStorage.setItem(STORAGE_KEYS.HEADERS, JSON.stringify(customHeaders));
+		localStorage.setItem(STORAGE_KEYS.BODY, customBody);
+		localStorage.setItem(STORAGE_KEYS.RAW_BODY_MODE, JSON.stringify(sendAsRawText));
+		localStorage.setItem(STORAGE_KEYS.USE_EDITOR_CONTENT, JSON.stringify(useEditorContent));
+
+		isDialogOpen = false;
+	}
+
+	function cancelSettings() {
+		// Reset temp
+		tempHeaders = [...customHeaders];
+		tempBody = customBody;
+		tempSendAsRawText = sendAsRawText;
+		tempUseEditorContent = useEditorContent;
+		isDialogOpen = false;
+	}
+
+	function clearAllSettings() {
+		if (confirm($LL.editor.clearAllConfirm())) {
+			// Clear all localStorage keys
+			Object.values(STORAGE_KEYS).forEach(key => {
+				localStorage.removeItem(key);
+			});
+
+			// Reset all values to defaults
+			urlInput = 'https://jsonplaceholder.typicode.com/todos/1';
+			httpMethod = 'GET';
+			customHeaders = [];
+			customBody = '';
+			sendAsRawText = false;
+			useEditorContent = false;
+			httpStatusCode = null;
+			responseTime = null;
+			error = '';
+
+			// Reset temp values
+			tempHeaders = [{ key: '', value: '' }];
+			tempBody = '';
+			tempSendAsRawText = false;
+			tempUseEditorContent = false;
+
+			// Save reset URL and method to localStorage
+			saveUrlAndMethod();
+		}
+	}
+
 	function addHeader() {
-		customHeaders = [...customHeaders, { key: '', value: '' }];
+		tempHeaders = [...tempHeaders, { key: '', value: '' }];
 	}
 
 	function removeHeader(index: number) {
-		customHeaders = customHeaders.filter((_, i) => i !== index);
+		tempHeaders = tempHeaders.filter((_, i) => i !== index);
 	}
 
 	function updateHeader(index: number, field: 'key' | 'value', value: string) {
-		customHeaders = customHeaders.map((header, i) =>
+		tempHeaders = tempHeaders.map((header, i) =>
 			i === index ? { ...header, [field]: value } : header
 		);
+	}
+
+	function saveUrlAndMethod() {
+		localStorage.setItem(STORAGE_KEYS.URL, urlInput);
+		localStorage.setItem(STORAGE_KEYS.METHOD, httpMethod);
+	}
+
+	function clearJson() {
+		jsonValue = '';
+		error = '';
+	}
+
+	async function copyJson() {
+		try {
+			await navigator.clipboard.writeText(jsonValue);
+			toast.success($LL.header.copySuccess());
+		} catch (e) {
+			console.error('Failed to copy to clipboard:', e);
+			// Fallback for older browsers
+			try {
+				const textArea = document.createElement('textarea');
+				textArea.value = jsonValue;
+				document.body.appendChild(textArea);
+				textArea.focus();
+				textArea.select();
+				document.execCommand('copy');
+				document.body.removeChild(textArea);
+				toast.success($LL.header.copySuccess());
+			} catch (fallbackError) {
+				console.error('Fallback copy failed:', fallbackError);
+				toast.error($LL.header.copyError());
+			}
+		}
 	}
 
 	function formatJson() {
@@ -142,7 +264,12 @@
 		}
 
 		isLoading = true;
-		error = '';
+		// Only clear error if it's a fetch-related error
+		if (error && (error.includes('fetch') || error.includes('HTTP'))) {
+			error = '';
+		}
+		httpStatusCode = null;
+		responseTime = null;
 
 		try {
 			// Build headers from custom headers
@@ -160,34 +287,72 @@
 
 			// For POST, PUT, PATCH requests, include body
 			if (['POST', 'PUT', 'PATCH'].includes(httpMethod)) {
-				if (customBody.trim()) {
-					// Use custom body if provided
-					options.body = customBody;
-				} else if (jsonValue.trim()) {
-					// Otherwise use editor content
-					try {
-						const bodyData = JSON.parse(jsonValue);
-						options.body = JSON.stringify(bodyData);
-					} catch {
-						options.body = '{}';
+				// Choose body content based on user preference
+				let bodyContent = '';
+				if (useEditorContent) {
+					bodyContent = jsonValue.trim();
+				} else {
+					bodyContent = customBody.trim();
+				}
+
+				if (bodyContent) {
+					if (sendAsRawText) {
+						// Send as raw text without parsing
+						options.body = bodyContent;
+					} else {
+						// Parse as JSON and stringify to ensure valid JSON format
+						try {
+							const parsedBody = JSON.parse(bodyContent);
+							options.body = JSON.stringify(parsedBody);
+							
+							// Ensure proper Content-Type header for JSON
+							// Remove any existing content-type headers (case-insensitive)
+							const headerKeys = Object.keys(headers);
+							const contentTypeKey = headerKeys.find(key => 
+								key.toLowerCase() === 'content-type'
+							);
+							
+							if (contentTypeKey) {
+								// Update existing header with correct value
+								headers[contentTypeKey] = 'application/json';
+							} else {
+								// Add new Content-Type header
+								headers['Content-Type'] = 'application/json';
+							}
+						} catch (e) {
+							error = 'Invalid JSON in request body';
+							isLoading = false;
+							return;
+						}
 					}
 				}
 			}
 
+			// Start timing the request
+			const startTime = performance.now();
+			console.log('Fetching URL:', urlInput, 'with options:', options);
 			const response = await fetch(urlInput, options);
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
+			// Calculate response time
+			const endTime = performance.now();
+			responseTime = Math.round(endTime - startTime);
+			httpStatusCode = response.status;
 
 			const contentType = response.headers.get('content-type');
 			if (!contentType || !contentType.includes('application/json')) {
 				console.warn('Response is not JSON, attempting to parse anyway');
 			}
 
+			// Try to parse JSON response regardless of status code
+			// Many APIs return JSON error messages
 			const data = await response.json();
 			jsonValue = JSON.stringify(data, null, 2);
-			error = '';
+
+			// Clear error only if it was a fetch error (not JSON parse error)
+			// Don't set HTTP errors since we're showing status code separately
+			if (response.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
+				error = '';
+			}
 		} catch (e) {
 			if (e instanceof Error) {
 				if (e.message.includes('Failed to fetch')) {
@@ -207,6 +372,15 @@
 		if (e.key === 'Enter') {
 			fetchJsonFromUrl();
 		}
+	}
+
+	function handleUrlBlur() {
+		saveUrlAndMethod();
+	}
+
+	function handleMethodChange(newMethod: string) {
+		httpMethod = newMethod;
+		saveUrlAndMethod();
 	}
 
 	$effect(() => {
@@ -238,6 +412,62 @@
 	});
 
 	onMount(() => {
+		// Load saved values from localStorage
+		const savedUrl = localStorage.getItem(STORAGE_KEYS.URL);
+		const savedMethod = localStorage.getItem(STORAGE_KEYS.METHOD);
+		const savedHeaders = localStorage.getItem(STORAGE_KEYS.HEADERS);
+		const savedBody = localStorage.getItem(STORAGE_KEYS.BODY);
+		const savedRawBodyMode = localStorage.getItem(STORAGE_KEYS.RAW_BODY_MODE);
+		const savedUseEditorContent = localStorage.getItem(STORAGE_KEYS.USE_EDITOR_CONTENT);
+
+		if (savedUrl) {
+			urlInput = savedUrl;
+		}
+		if (savedMethod && httpMethods.includes(savedMethod as any)) {
+			httpMethod = savedMethod;
+		}
+		if (savedHeaders) {
+			try {
+				const parsed = JSON.parse(savedHeaders);
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					// Ensure it's a proper array assignment
+					customHeaders = [...parsed];
+				} else {
+					// Keep empty if no headers saved
+					customHeaders = [];
+				}
+			} catch (e) {
+				console.error('Failed to parse saved headers:', e);
+				// Keep empty on error
+				customHeaders = [];
+			}
+		} else {
+			// Keep empty if nothing saved
+			customHeaders = [];
+		}
+
+		if (savedBody !== null && savedBody !== undefined && savedBody !== '') {
+			customBody = savedBody;
+		}
+
+		if (savedRawBodyMode !== null) {
+			try {
+				sendAsRawText = JSON.parse(savedRawBodyMode);
+			} catch (e) {
+				console.error('Failed to parse saved raw body mode:', e);
+				sendAsRawText = false;
+			}
+		}
+
+		if (savedUseEditorContent !== null) {
+			try {
+				useEditorContent = JSON.parse(savedUseEditorContent);
+			} catch (e) {
+				console.error('Failed to parse saved use editor content:', e);
+				useEditorContent = false;
+			}
+		}
+
 		const handleNodeClick = (e: CustomEvent) => {
 			const path = e.detail;
 			if (path && editorRef) {
@@ -284,7 +514,7 @@
 							<DropdownMenu.Content align="start">
 								{#each httpMethods as method}
 									<DropdownMenu.Item
-										onclick={() => (httpMethod = method)}
+										onclick={() => handleMethodChange(method)}
 										class="flex items-center justify-between"
 									>
 										<span>{method}</span>
@@ -300,13 +530,14 @@
 							placeholder={$LL.editor.urlPlaceholder()}
 							bind:value={urlInput}
 							onkeydown={handleUrlKeydown}
+							onblur={handleUrlBlur}
 							class="h-7 text-xs flex-1"
 							disabled={isLoading}
 						/>
 						<Button
 							size="sm"
 							variant="ghost"
-							onclick={() => (isDialogOpen = true)}
+							onclick={openSettingsDialog}
 							class="h-7 px-2"
 							title={$LL.editor.requestSettings()}
 						>
@@ -328,6 +559,26 @@
 						</Button>
 					</div>
 					<div class="h-8 flex items-center justify-end px-2 flex-shrink-0 gap-1 border-t">
+						<Button
+							size="sm"
+							variant="ghost"
+							onclick={clearJson}
+							class="h-7 px-2 text-sm flex items-center gap-1"
+							title={$LL.header.clear()}
+						>
+							<X class="w-3 h-3" />
+							{$LL.header.clear()}
+						</Button>
+						<Button
+							size="sm"
+							variant="ghost"
+							onclick={copyJson}
+							class="h-7 px-2 text-sm flex items-center gap-1"
+							title={$LL.header.copy()}
+						>
+							<Copy class="w-3 h-3" />
+							{$LL.header.copy()}
+						</Button>
 						<Button
 							size="sm"
 							variant="ghost"
@@ -374,8 +625,25 @@
 	<!-- Footer -->
 	<footer class="h-8 border-t bg-card flex items-center px-4 text-sm text-muted-foreground">
 		<span>{$LL.footer.ready()}</span>
+		{#if httpStatusCode !== null}
+			<span class="ml-4 flex items-center gap-2">
+				<span
+					class={httpStatusCode >= 200 && httpStatusCode < 300
+						? 'text-green-600'
+						: httpStatusCode >= 400
+							? 'text-red-600'
+							: 'text-yellow-600'}
+				>
+					HTTP {httpStatusCode}
+				</span>
+				{#if responseTime !== null}
+					<span class="text-muted-foreground">|</span>
+					<span>{responseTime}ms</span>
+				{/if}
+			</span>
+		{/if}
 		{#if error}
-			<span class="ml-auto text-destructive">{error}</span>
+			<span class="ml-4 text-destructive">{error}</span>
 		{/if}
 		<div class="ml-auto flex items-center gap-1">
 			<span
@@ -402,30 +670,27 @@
 			<div>
 				<h4 class="text-sm font-medium mb-2">{$LL.editor.headers()}</h4>
 				<div class="space-y-2">
-					{#each customHeaders as header, index}
-						<div class="flex gap-2">
-							<Input
-								placeholder={$LL.editor.headerKey()}
-								value={header.key}
-								oninput={(e) => updateHeader(index, 'key', e.currentTarget.value)}
-								class="flex-1"
-							/>
-							<Input
-								placeholder={$LL.editor.headerValue()}
-								value={header.value}
-								oninput={(e) => updateHeader(index, 'value', e.currentTarget.value)}
-								class="flex-1"
-							/>
-							<Button
-								variant="ghost"
-								size="icon"
-								onclick={() => removeHeader(index)}
-								disabled={customHeaders.length === 1 && index === 0}
-							>
-								<Trash2 class="h-4 w-4" />
-							</Button>
-						</div>
-					{/each}
+					<div class={tempHeaders.length >= 4 ? "max-h-48 overflow-y-auto space-y-2" : "space-y-2"}>
+						{#each tempHeaders as header, index}
+							<div class="flex gap-2">
+								<Input
+									placeholder={$LL.editor.headerKey()}
+									value={header.key}
+									oninput={(e) => updateHeader(index, 'key', e.currentTarget.value)}
+									class="flex-1"
+								/>
+								<Input
+									placeholder={$LL.editor.headerValue()}
+									value={header.value}
+									oninput={(e) => updateHeader(index, 'value', e.currentTarget.value)}
+									class="flex-1"
+								/>
+								<Button variant="ghost" size="icon" onclick={() => removeHeader(index)}>
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
+						{/each}
+					</div>
 					<Button variant="outline" size="sm" onclick={addHeader} class="w-full">
 						<Plus class="h-4 w-4 mr-2" />
 						{$LL.editor.addHeader()}
@@ -439,21 +704,40 @@
 				<p class="text-xs text-muted-foreground mb-2">
 					{$LL.editor.bodyDescription()}
 				</p>
+				<div class="space-y-3 mb-3">
+					<div class="flex items-center space-x-2">
+						<Checkbox id="use-editor-content" bind:checked={tempUseEditorContent} />
+						<label for="use-editor-content" class="text-sm cursor-pointer">
+							{$LL.editor.useEditorContent()}
+						</label>
+					</div>
+					<div class="flex items-center space-x-2">
+						<Checkbox id="raw-body-mode" bind:checked={tempSendAsRawText} />
+						<label for="raw-body-mode" class="text-sm cursor-pointer">
+							{$LL.editor.sendAsRawText()}
+						</label>
+					</div>
+				</div>
 				<Textarea
 					placeholder={$LL.editor.bodyPlaceholder()}
-					bind:value={customBody}
+					bind:value={tempBody}
 					class="min-h-[150px] font-mono text-sm"
 				/>
 			</div>
 		</div>
 
-		<Dialog.Footer>
-			<Button variant="outline" onclick={() => (isDialogOpen = false)}>
-				{$LL.editor.cancel()}
+		<Dialog.Footer class="!flex !justify-between !items-center !flex-row">
+			<Button variant="destructive" onclick={clearAllSettings}>
+				{$LL.editor.clearAll()}
 			</Button>
-			<Button onclick={() => (isDialogOpen = false)}>
-				{$LL.editor.save()}
-			</Button>
+			<div class="flex gap-2">
+				<Button variant="outline" onclick={cancelSettings}>
+					{$LL.editor.cancel()}
+				</Button>
+				<Button onclick={saveSettings}>
+					{$LL.editor.save()}
+				</Button>
+			</div>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

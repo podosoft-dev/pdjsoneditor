@@ -2,6 +2,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { ModeWatcher } from 'mode-watcher';
+	import { Toaster } from '$lib/components/ui/sonner';
 	import { onMount } from 'svelte';
 	import { loadLocale } from '$i18n/i18n-util.sync';
 	import { setLocale } from '$i18n/i18n-svelte';
@@ -30,4 +31,5 @@
 </svelte:head>
 
 <ModeWatcher />
+<Toaster />
 {@render children?.()}

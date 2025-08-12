@@ -3,9 +3,12 @@ import type { BaseTranslation } from '../i18n-types';
 const en: BaseTranslation = {
 	header: {
 		title: 'JSON Editor',
+		clear: 'Clear',
+		copy: 'Copy',
+		copySuccess: 'Copied to clipboard',
+		copyError: 'Failed to copy to clipboard',
 		format: 'Format',
 		minify: 'Minify',
-		clear: 'Clear',
 		sample: 'Sample Data',
 		language: 'Language'
 	},
@@ -24,9 +27,12 @@ const en: BaseTranslation = {
 		headerValue: 'Header value',
 		addHeader: 'Add Header',
 		body: 'Body',
-		bodyDescription:
-			'Optional request body. If empty, the editor content will be used for POST/PUT/PATCH requests.',
+		bodyDescription: 'Configure the request body for POST/PUT/PATCH requests.',
 		bodyPlaceholder: 'Enter request body (JSON, XML, etc.)',
+		useEditorContent: 'Use editor content as request body',
+		sendAsRawText: 'Send as raw text (don\'t parse as JSON)',
+		clearAll: 'Clear All',
+		clearAllConfirm: 'Are you sure you want to clear all settings? This will remove all saved headers, body, and URL from storage.',
 		cancel: 'Cancel',
 		save: 'Save'
 	},

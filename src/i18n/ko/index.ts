@@ -3,9 +3,12 @@ import type { Translation } from '../i18n-types';
 const ko: Translation = {
 	header: {
 		title: 'JSON 에디터',
+		clear: '지우기',
+		copy: '복사',
+		copySuccess: '클립보드에 복사됨',
+		copyError: '클립보드 복사 실패',
 		format: '정렬',
 		minify: '축소',
-		clear: '지우기',
 		sample: '샘플 데이터',
 		language: '언어'
 	},
@@ -24,9 +27,12 @@ const ko: Translation = {
 		headerValue: '헤더 값',
 		addHeader: '헤더 추가',
 		body: '본문',
-		bodyDescription:
-			'선택적 요청 본문입니다. 비어있으면 POST/PUT/PATCH 요청시 에디터 내용이 사용됩니다.',
+		bodyDescription: 'POST/PUT/PATCH 요청에 사용할 본문을 설정합니다.',
 		bodyPlaceholder: '요청 본문 입력 (JSON, XML 등)',
+		useEditorContent: '에디터 내용을 요청 본문으로 사용',
+		sendAsRawText: '원시 텍스트로 전송 (JSON 파싱하지 않음)',
+		clearAll: '모두 지우기',
+		clearAllConfirm: '모든 설정을 지우시겠습니까? 저장된 헤더, 본문, URL이 모두 삭제됩니다.',
 		cancel: '취소',
 		save: '저장'
 	},

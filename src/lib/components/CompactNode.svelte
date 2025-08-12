@@ -62,19 +62,19 @@
 		const isDark = mode.current === 'dark';
 		switch (type) {
 			case 'string':
-				return isDark ? '#60a5fa' : '#2563eb';
+				return isDark ? '#10b981' : '#059669'; // Emerald green for strings
 			case 'number':
-				return isDark ? '#f87171' : '#dc2626';
+				return isDark ? '#3b82f6' : '#1d4ed8'; // Blue for numbers
 			case 'boolean':
-				return isDark ? '#f87171' : '#dc2626';
+				return isDark ? '#f59e0b' : '#d97706'; // Amber for booleans
 			case 'null':
-				return isDark ? '#f87171' : '#dc2626';
+				return isDark ? '#6b7280' : '#9ca3af'; // Gray for null values
 			case 'key':
-				return isDark ? '#f87171' : '#dc2626';
+				return isDark ? '#8b5cf6' : '#7c3aed'; // Purple for object keys
 			case 'reference':
-				return isDark ? '#9ca3af' : '#6b7280';
+				return isDark ? '#06b6d4' : '#0891b2'; // Cyan for references
 			default:
-				return isDark ? '#e5e7eb' : '#1f2937';
+				return isDark ? '#e5e7eb' : '#374151'; // Default text color
 		}
 	}
 
@@ -153,8 +153,8 @@
 		<Handle
 			type="target"
 			position={Position.Left}
-			class="!w-1.5 !h-1.5 !bg-gray-600 !border-gray-700"
-			style="left: -3px;"
+			class="!w-1.5 !h-1.5"
+			style="left: -3px; background-color: {mode.current === 'dark' ? '#6b7280' : '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
 		/>
 	{/if}
 
@@ -246,18 +246,10 @@
 										id={`${id}-${item.key}`}
 										class="!w-2.5 !h-2.5 item-handle"
 										style="position: relative; background-color: {item.isReferenceExpanded
-											? mode.current === 'dark'
-												? '#34d399'
-												: '#10b981'
-											: mode.current === 'dark'
-												? '#6b7280'
-												: '#9ca3af'}; border-color: {item.isReferenceExpanded
-											? mode.current === 'dark'
-												? '#10b981'
-												: '#059669'
-											: mode.current === 'dark'
-												? '#4b5563'
-												: '#6b7280'};"
+											? (mode.current === 'dark' ? '#10b981' : '#059669')
+											: (mode.current === 'dark' ? '#6b7280' : '#9ca3af')}; border-color: {item.isReferenceExpanded
+											? (mode.current === 'dark' ? '#059669' : '#047857')
+											: (mode.current === 'dark' ? '#4b5563' : '#6b7280')};"
 									/>
 								</button>
 							{/if}
@@ -317,9 +309,7 @@
 			type="source"
 			position={Position.Right}
 			class="!w-1.5 !h-1.5"
-			style="right: -3px; background-color: {mode.current === 'dark'
-				? '#6b7280'
-				: '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
+			style="right: -3px; background-color: {mode.current === 'dark' ? '#6b7280' : '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
 		/>
 	{/if}
 </div>
@@ -525,24 +515,4 @@
 		border-color: var(--color-muted-foreground);
 	}
 
-	:global(.dark) .compact-node {
-		background: #1f2937;
-		border-color: #374151;
-	}
-
-	:global(.dark) .toggle-btn {
-		color: #d1d5db;
-	}
-
-	:global(.dark) .toggle-btn:hover {
-		color: #e5e7eb;
-	}
-
-	:global(.dark) .brackets {
-		color: #9ca3af;
-	}
-
-	:global(.dark) .node-items {
-		border-left-color: #374151;
-	}
 </style>

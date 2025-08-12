@@ -230,7 +230,7 @@
 		DAGRE: {
 			RANK_DIR: 'LR',
 			NODE_SEP: 20, // LR mode: vertical spacing between nodes at same x coordinate
-			RANK_SEP: 50, // LR mode: horizontal spacing between levels
+			RANK_SEP: 150, // LR mode: horizontal spacing between levels
 			EDGE_SEP: 10,
 			RANKER: 'network-simplex',
 			ALIGN: 'UL',
