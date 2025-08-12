@@ -210,7 +210,6 @@
 	}
 
 	$effect(() => {
-		// 명시적으로 jsonValue를 읽어서 의존성 추적
 		const currentJsonValue = jsonValue;
 		// console.log('[Page Effect] JSON value changed, length:', currentJsonValue.length);
 
