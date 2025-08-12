@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import {
 		SvelteFlow,
+		SvelteFlowProvider,
 		Controls,
 		Background,
 		MiniMap,
@@ -12,6 +13,7 @@
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import CompactNode from './CompactNode.svelte';
+	import FitViewController from './FitViewController.svelte';
 	import dagre from 'dagre';
 	import { mode } from 'mode-watcher';
 	import type { JsonValue, JsonObject, NodeItem, JsonStructure } from '$lib/types/json';
@@ -49,13 +51,21 @@
 	let isFirstLoad = true;
 	let previousJsonData: JsonValue | null = null;
 	const nodeCallbacks = new Map<string, { toggle: () => void; expandAll: () => void }>();
+	let triggerFitView = $state(false);
 
 	// Helper function to get original number format from JSON string
-	function getOriginalNumberFormat(jsonStr: string, path: string, parsedValue: number): string | null {
+	function getOriginalNumberFormat(
+		jsonStr: string,
+		path: string,
+		parsedValue: number
+	): string | null {
 		try {
 			// For root level properties, create a simple regex
 			if (!path.includes('.')) {
-				const keyPattern = new RegExp(`"${path}"\\s*:\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)`, 'g');
+				const keyPattern = new RegExp(
+					`"${path}"\\s*:\\s*([+-]?\\d*\\.?\\d+(?:[eE][+-]?\\d+)?)`,
+					'g'
+				);
 				const match = keyPattern.exec(jsonStr);
 				if (match && parseFloat(match[1]) === parsedValue) {
 					return match[1];
@@ -101,7 +111,10 @@
 	}
 
 	// Compare two JSON structures to detect structural changes
-	function hasStructuralChange(oldStruct: JsonStructure | string | null, newStruct: JsonStructure | string | null): boolean {
+	function hasStructuralChange(
+		oldStruct: JsonStructure | string | null,
+		newStruct: JsonStructure | string | null
+	): boolean {
 		if (oldStruct === newStruct) return false;
 		if (oldStruct === null || newStruct === null) return true;
 		if (typeof oldStruct !== typeof newStruct) return true;
@@ -110,7 +123,12 @@
 			return oldStruct !== newStruct; // Type change
 		}
 
-		if (typeof oldStruct === 'object' && typeof newStruct === 'object' && oldStruct._type === 'array' && newStruct._type === 'array') {
+		if (
+			typeof oldStruct === 'object' &&
+			typeof newStruct === 'object' &&
+			oldStruct._type === 'array' &&
+			newStruct._type === 'array'
+		) {
 			// Consider it structural if array length changes significantly (more than 20% or by more than 10 items)
 			const oldLength = oldStruct._length ?? 0;
 			const newLength = newStruct._length ?? 0;
@@ -122,7 +140,12 @@
 			return hasStructuralChange(oldStruct._sample ?? null, newStruct._sample ?? null);
 		}
 
-		if (typeof oldStruct === 'object' && typeof newStruct === 'object' && oldStruct._type === 'object' && newStruct._type === 'object') {
+		if (
+			typeof oldStruct === 'object' &&
+			typeof newStruct === 'object' &&
+			oldStruct._type === 'object' &&
+			newStruct._type === 'object'
+		) {
 			// Check if keys are different
 			const oldKeys = Object.keys(oldStruct).filter((k) => k !== '_type');
 			const newKeys = Object.keys(newStruct).filter((k) => k !== '_type');
@@ -133,7 +156,13 @@
 				if (!newKeys.includes(key)) return true;
 				const oldValue = oldStruct[key] ?? null;
 				const newValue = newStruct[key] ?? null;
-				if (hasStructuralChange(oldValue as JsonStructure | string | null, newValue as JsonStructure | string | null)) return true;
+				if (
+					hasStructuralChange(
+						oldValue as JsonStructure | string | null,
+						newValue as JsonStructure | string | null
+					)
+				)
+					return true;
 			}
 		}
 
@@ -145,9 +174,6 @@
 	let expectedNodeCount = 0; // Number of nodes created at initial load
 	let measuredNodeCount = 0; // Number of nodes measured
 	let initialLoadComplete = false;
-
-	// Key to force re-mount SvelteFlow when structure changes
-	let flowKey = $state(0);
 
 	function scheduleReflow() {
 		if (reflowScheduled) {
@@ -204,7 +230,7 @@
 		DAGRE: {
 			RANK_DIR: 'LR',
 			NODE_SEP: 20, // LR mode: vertical spacing between nodes at same x coordinate
-			RANK_SEP: 150, // LR mode: horizontal spacing between levels
+			RANK_SEP: 50, // LR mode: horizontal spacing between levels
 			EDGE_SEP: 10,
 			RANKER: 'network-simplex',
 			ALIGN: 'UL',
@@ -313,7 +339,9 @@
 			return;
 		} else if (typeof data === 'object') {
 			const isArray = Array.isArray(data);
-			const allEntries = isArray ? data.map((v, i) => [String(i), v] as [string, JsonValue]) : Object.entries(data);
+			const allEntries = isArray
+				? data.map((v, i) => [String(i), v] as [string, JsonValue])
+				: Object.entries(data);
 
 			// Store total count before limiting
 			const totalEntriesCount = allEntries.length;
@@ -367,7 +395,7 @@
 					// Map typeof results to our supported types
 					let itemType: 'string' | 'number' | 'boolean' | 'null' | 'undefined' = 'string';
 					let displayValue = String(v);
-					
+
 					if (typeof v === 'string') {
 						itemType = 'string';
 					} else if (typeof v === 'number') {
@@ -383,7 +411,7 @@
 					} else if (v === undefined) {
 						itemType = 'undefined';
 					}
-					
+
 					items.push({ key: k, value: displayValue, type: itemType, path: itemPath });
 				}
 			});
@@ -765,8 +793,6 @@
 			showAllItemsNodes.clear();
 			isFirstLoad = true;
 			previousJsonData = jsonData;
-			// Force SvelteFlow to re-mount and reset zoom
-			flowKey++;
 		} else {
 			// Only values changed - preserve expansion states
 			console.log('[JsonGraph] Value change detected, preserving expansion states');
@@ -866,26 +892,25 @@
 	});
 </script>
 
-<div class="h-full {className}" style="background-color: var(--color-background);">
-	{#key flowKey}
+<SvelteFlowProvider>
+	<div class="h-full {className}" style="background-color: var(--color-background);">
 		<SvelteFlow
 			{nodes}
 			{edges}
 			{nodeTypes}
-			fitView
-			fitViewOptions={{ padding: 0.2 }}
 			minZoom={0.3}
 			maxZoom={2}
 			nodeOrigin={[0.5, 0.5]}
 			attributionPosition="bottom-left"
 			style="background-color: {mode.current === 'dark' ? '#0a0a0a' : '#fafafa'};"
 		>
+			<FitViewController {triggerFitView} />
 			<Controls />
 			<Background variant={'dots' as BackgroundVariant} />
 			<MiniMap />
 		</SvelteFlow>
-	{/key}
-</div>
+	</div>
+</SvelteFlowProvider>
 
 <style>
 	:global(.svelte-flow) {
