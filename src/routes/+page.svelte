@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import JsonEditor from '$lib/components/JsonEditor.svelte';
 	import JsonGraph from '$lib/components/JsonGraph.svelte';
-	import { Button } from '$lib/components/ui/button';
+    import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -27,8 +27,10 @@
 	import { mode, toggleMode } from 'mode-watcher';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import LL from '$i18n/i18n-svelte';
-	import { toast } from 'svelte-sonner';
-	import type { JsonValue } from '$lib/types/json';
+    import { toast } from 'svelte-sonner';
+    import type { JsonValue } from '$lib/types/json';
+    import { STORAGE_KEYS } from '$lib/constants';
+    import { requestJson, type HttpMethod } from '$lib/services/http';
 
 	// 	let jsonValue = $state(`{
 	//   "name": "John Doe",
@@ -95,20 +97,12 @@
 	let editorRef: JsonEditor;
 	let parseTimeout: ReturnType<typeof setTimeout>;
 
-	// LocalStorage keys
-	const STORAGE_KEYS = {
-		URL: 'pdjsoneditor_url',
-		METHOD: 'pdjsoneditor_method',
-		HEADERS: 'pdjsoneditor_headers',
-		BODY: 'pdjsoneditor_body',
-		RAW_BODY_MODE: 'pdjsoneditor_raw_body_mode',
-		USE_EDITOR_CONTENT: 'pdjsoneditor_use_editor_content'
-	};
+    // LocalStorage keys are centralized in $lib/constants
 
 	// Initialize with empty values (will be populated from localStorage in onMount)
 	let urlInput = $state<string>('https://jsonplaceholder.typicode.com/todos/1');
 	let isLoading = $state<boolean>(false);
-	let httpMethod = $state<string>('GET');
+    let httpMethod = $state<string>('GET');
 	let isDialogOpen = $state<boolean>(false);
 	let customHeaders = $state<Array<{ key: string; value: string }>>([]);
 	let tempHeaders = $state<Array<{ key: string; value: string }>>([]);
@@ -121,7 +115,10 @@
 	let httpStatusCode = $state<number | null>(null);
 	let responseTime = $state<number | null>(null);
 
-	const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+    const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+
+    // Track in-flight request for cancellation
+    let abortController: AbortController | null = null;
 
 	function openSettingsDialog() {
 		// Copy current headers to temp, ensure it's a proper array
@@ -257,116 +254,70 @@
 		}
 	}
 
-	async function fetchJsonFromUrl() {
-		if (!urlInput.trim()) {
-			error = $LL.editor.urlRequired();
-			return;
-		}
+    async function fetchJsonFromUrl() {
+        if (!urlInput.trim()) {
+            error = $LL.editor.urlRequired();
+            return;
+        }
 
-		isLoading = true;
-		// Only clear error if it's a fetch-related error
-		if (error && (error.includes('fetch') || error.includes('HTTP'))) {
-			error = '';
-		}
-		httpStatusCode = null;
-		responseTime = null;
+        isLoading = true;
+        // Only clear error if it's a fetch-related error
+        if (error && (error.includes('fetch') || error.includes('HTTP'))) {
+            error = '';
+        }
+        httpStatusCode = null;
+        responseTime = null;
 
-		try {
-			// Build headers from custom headers
-			const headers: Record<string, string> = {};
-			customHeaders.forEach((header) => {
-				if (header.key && header.value) {
-					headers[header.key] = header.value;
-				}
-			});
+        try {
+            // Cancel previous request if any
+            if (abortController) {
+                abortController.abort();
+            }
+            abortController = new AbortController();
 
-			const options: RequestInit = {
-				method: httpMethod,
-				headers
-			};
+            const startTime = performance.now();
+            const res = await requestJson({
+                method: httpMethod as HttpMethod,
+                url: urlInput,
+                headers: customHeaders,
+                editorJson: jsonValue,
+                customBody,
+                sendAsRawText,
+                useEditorContent,
+                signal: abortController.signal
+            });
+            const endTime = performance.now();
+            responseTime = Math.round(endTime - startTime);
+            httpStatusCode = res.status;
 
-			// For POST, PUT, PATCH requests, include body
-			if (['POST', 'PUT', 'PATCH'].includes(httpMethod)) {
-				// Choose body content based on user preference
-				let bodyContent = '';
-				if (useEditorContent) {
-					bodyContent = jsonValue.trim();
-				} else {
-					bodyContent = customBody.trim();
-				}
+            if (res.data !== undefined) {
+                jsonValue = JSON.stringify(res.data, null, 2);
+            } else if (res.rawText !== undefined) {
+                // Non-JSON 응답은 텍스트로 보여줌
+                jsonValue = JSON.stringify({ response: res.rawText }, null, 2);
+            }
 
-				if (bodyContent) {
-					if (sendAsRawText) {
-						// Send as raw text without parsing
-						options.body = bodyContent;
-					} else {
-						// Parse as JSON and stringify to ensure valid JSON format
-						try {
-							const parsedBody = JSON.parse(bodyContent);
-							options.body = JSON.stringify(parsedBody);
-							
-							// Ensure proper Content-Type header for JSON
-							// Remove any existing content-type headers (case-insensitive)
-							const headerKeys = Object.keys(headers);
-							const contentTypeKey = headerKeys.find(key => 
-								key.toLowerCase() === 'content-type'
-							);
-							
-							if (contentTypeKey) {
-								// Update existing header with correct value
-								headers[contentTypeKey] = 'application/json';
-							} else {
-								// Add new Content-Type header
-								headers['Content-Type'] = 'application/json';
-							}
-						} catch (e) {
-							error = 'Invalid JSON in request body';
-							isLoading = false;
-							return;
-						}
-					}
-				}
-			}
-
-			// Start timing the request
-			const startTime = performance.now();
-			console.log('Fetching URL:', urlInput, 'with options:', options);
-			const response = await fetch(urlInput, options);
-
-			// Calculate response time
-			const endTime = performance.now();
-			responseTime = Math.round(endTime - startTime);
-			httpStatusCode = response.status;
-
-			const contentType = response.headers.get('content-type');
-			if (!contentType || !contentType.includes('application/json')) {
-				console.warn('Response is not JSON, attempting to parse anyway');
-			}
-
-			// Try to parse JSON response regardless of status code
-			// Many APIs return JSON error messages
-			const data = await response.json();
-			jsonValue = JSON.stringify(data, null, 2);
-
-			// Clear error only if it was a fetch error (not JSON parse error)
-			// Don't set HTTP errors since we're showing status code separately
-			if (response.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
-				error = '';
-			}
-		} catch (e) {
-			if (e instanceof Error) {
-				if (e.message.includes('Failed to fetch')) {
-					error = $LL.editor.fetchError();
-				} else {
-					error = e.message;
-				}
-			} else {
-				error = $LL.editor.fetchError();
-			}
-		} finally {
-			isLoading = false;
-		}
-	}
+            if (res.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
+                error = '';
+            }
+        } catch (e) {
+            if ((e as any)?.name === 'AbortError') {
+                // silently ignore aborted request
+                return;
+            }
+            if (e instanceof Error) {
+                if (e.message.includes('Failed to fetch')) {
+                    error = $LL.editor.fetchError();
+                } else {
+                    error = e.message;
+                }
+            } else {
+                error = $LL.editor.fetchError();
+            }
+        } finally {
+            isLoading = false;
+        }
+    }
 
 	function handleUrlKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') {
