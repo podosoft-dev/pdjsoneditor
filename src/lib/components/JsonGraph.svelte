@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import {
 		SvelteFlow,
 		SvelteFlowProvider,
@@ -17,6 +17,11 @@
 	import dagre from 'dagre';
 	import { mode } from 'mode-watcher';
 	import { logger } from '$lib/logger';
+	import { graphLoading } from '$lib/stores/graphLoading';
+	// Use Vite worker plugin to ensure bundling works in all environments
+	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+	// @ts-ignore - Vite injects a Worker constructor type via ?worker
+	import GraphLayoutWorker from '$lib/workers/graphLayout.worker.ts?worker&module';
 	import type { JsonValue, JsonObject, NodeItem, JsonStructure } from '$lib/types/json';
 
 	interface Props {
@@ -190,14 +195,14 @@
 		});
 	}
 
-    function reflowWithMeasuredHeights() {
-        if (!nodes || nodes.length === 0) {
-            logger.debug('[reflowWithMeasuredHeights] No nodes to reflow');
-            return;
-        }
+	function reflowWithMeasuredHeights() {
+		if (!nodes || nodes.length === 0) {
+			logger.debug('[reflowWithMeasuredHeights] No nodes to reflow');
+			return;
+		}
 
-        logger.debug('[reflowWithMeasuredHeights] Starting reflow with ' + nodes.length + ' nodes');
-        logger.debug('[reflowWithMeasuredHeights] Measured heights count: ' + measuredHeights.size);
+		logger.debug('[reflowWithMeasuredHeights] Starting reflow with ' + nodes.length + ' nodes');
+		logger.debug('[reflowWithMeasuredHeights] Measured heights count: ' + measuredHeights.size);
 
 		// Clone current state and re-run dagre using measured heights
 		tempNodes = nodes.map((n) => ({ ...n }));
@@ -222,20 +227,20 @@
 	let nodeId = 0;
 
 	// ============ Layout Configuration ============
-    const LAYOUT_CONFIG = {
-        // Node size
-        NODE_WIDTH: 280,
-        INITIAL_HEIGHT: 100, // Fallback height (should rarely be used)
+	const LAYOUT_CONFIG = {
+		// Node size
+		NODE_WIDTH: 280,
+		INITIAL_HEIGHT: 100, // Fallback height (should rarely be used)
 
-        // Estimated layout metrics (keep in sync with CompactNode.svelte CSS)
-        METRICS: {
-            NODE_PADDING_Y: 16, // .compact-node padding 8px top/bottom => 16
-            NODE_BORDER_Y: 2,   // .compact-node border 1px top/bottom => 2
-            HEADER_HEIGHT: 20,  // .node-header min-height
-            ITEMS_TOP_MARGIN: 4, // .node-items margin-top
-            ITEM_ROW_HEIGHT: 24, // .item fixed height
-            MORE_BUTTON_HEIGHT: 24 // .more-items-btn height
-        },
+		// Estimated layout metrics (keep in sync with CompactNode.svelte CSS)
+		METRICS: {
+			NODE_PADDING_Y: 16, // .compact-node padding 8px top/bottom => 16
+			NODE_BORDER_Y: 2, // .compact-node border 1px top/bottom => 2
+			HEADER_HEIGHT: 20, // .node-header min-height
+			ITEMS_TOP_MARGIN: 4, // .node-items margin-top
+			ITEM_ROW_HEIGHT: 24, // .item fixed height
+			MORE_BUTTON_HEIGHT: 24 // .more-items-btn height
+		},
 
 		// dagre layout settings
 		DAGRE: {
@@ -263,50 +268,239 @@
 	const dagreGraph = new dagre.graphlib.Graph();
 	dagreGraph.setDefaultEdgeLabel(() => ({}));
 
+	let regenTimer: number | null = null;
+	let fakeProgressTimer: number | null = null;
+
+	async function performLayoutWithWorker(): Promise<void> {
+		// Instantiate bundled worker via Vite's ?worker plugin
+		const worker: Worker = new (GraphLayoutWorker as any)();
+		const LARGE_GRAPH_NODE_THRESHOLD = 400;
+		const isLarge = tempNodes.length >= LARGE_GRAPH_NODE_THRESHOLD;
+		const cfg = {
+			...LAYOUT_CONFIG,
+			DAGRE: {
+				...LAYOUT_CONFIG.DAGRE,
+				RANKER: isLarge ? 'longest-path' : LAYOUT_CONFIG.DAGRE.RANKER,
+				NODE_SEP: isLarge
+					? Math.max(16, LAYOUT_CONFIG.DAGRE.NODE_SEP - 4)
+					: LAYOUT_CONFIG.DAGRE.NODE_SEP,
+				RANK_SEP: isLarge
+					? Math.max(80, LAYOUT_CONFIG.DAGRE.RANK_SEP - 40)
+					: LAYOUT_CONFIG.DAGRE.RANK_SEP
+			}
+		};
+
+		graphLoading.set({ active: true, phase: 'build', progress: 0 });
+
+		return new Promise((resolve, reject) => {
+			worker.onmessage = (e: MessageEvent) => {
+				const data: any = e.data;
+				if (data.type === 'progress') {
+					// Stop fake progress when real progress starts arriving
+					if (fakeProgressTimer) {
+						clearInterval(fakeProgressTimer);
+						fakeProgressTimer = null;
+					}
+					graphLoading.set({ active: true, phase: data.phase, progress: data.progress });
+				} else if (data.type === 'done') {
+					tempNodes = data.nodes;
+					graphLoading.set({ active: true, phase: 'finalize', progress: 1 });
+					worker.terminate();
+					resolve();
+				}
+			};
+			worker.onerror = (err) => {
+				worker.terminate();
+				reject(err);
+			};
+			worker.postMessage({
+				type: 'layout',
+				nodes: tempNodes,
+				edges: tempEdges,
+				measuredHeights: Array.from(measuredHeights.entries()),
+				showAllItemsNodeIds: Array.from(showAllItemsNodes),
+				config: cfg
+			});
+		});
+	}
+
 	// Initial node height (used until actual measurements arrive)
-    function getInitialNodeHeight(): number {
-        return LAYOUT_CONFIG.INITIAL_HEIGHT;
-    }
+	function getInitialNodeHeight(): number {
+		return LAYOUT_CONFIG.INITIAL_HEIGHT;
+	}
 
-    function estimateDisplayItemCount(node: Node): number {
-        if (!node.data?.isExpanded) return 0;
-        const total = node.data.items?.length ?? 0;
-        const nodeShowsAll = showAllItemsNodes.has(node.id);
-        if (nodeShowsAll) return total;
-        return Math.min(total, LAYOUT_CONFIG.MAX_DISPLAY_ITEMS);
-    }
+	function estimateDisplayItemCount(node: Node): number {
+		if (!node.data?.isExpanded) return 0;
+		const total = node.data.items?.length ?? 0;
+		const nodeShowsAll = showAllItemsNodes.has(node.id);
+		if (nodeShowsAll) return total;
+		return Math.min(total, LAYOUT_CONFIG.MAX_DISPLAY_ITEMS);
+	}
 
-    function hasMoreButton(node: Node): boolean {
-        if (!node.data?.isExpanded) return false;
-        const total = node.data.items?.length ?? 0;
-        const nodeShowsAll = showAllItemsNodes.has(node.id);
-        return total > LAYOUT_CONFIG.MAX_DISPLAY_ITEMS && !nodeShowsAll;
-    }
+	function hasMoreButton(node: Node): boolean {
+		if (!node.data?.isExpanded) return false;
+		const total = node.data.items?.length ?? 0;
+		const nodeShowsAll = showAllItemsNodes.has(node.id);
+		return total > LAYOUT_CONFIG.MAX_DISPLAY_ITEMS && !nodeShowsAll;
+	}
 
-    function estimateNodeHeight(node: Node): number {
-        const M = LAYOUT_CONFIG.METRICS;
-        // base = vertical padding + header
-        let h = M.NODE_PADDING_Y + M.NODE_BORDER_Y + M.HEADER_HEIGHT;
-        if (node.data?.isExpanded) {
-            const count = estimateDisplayItemCount(node);
-            const extraBtn = hasMoreButton(node) ? M.MORE_BUTTON_HEIGHT : 0;
-            h += M.ITEMS_TOP_MARGIN + count * M.ITEM_ROW_HEIGHT + extraBtn;
-        }
-        return Math.max(h, 32); // guard minimum
-    }
+	function estimateNodeHeight(node: Node): number {
+		const M = LAYOUT_CONFIG.METRICS;
+		// base = vertical padding + header
+		let h = M.NODE_PADDING_Y + M.NODE_BORDER_Y + M.HEADER_HEIGHT;
+		if (node.data?.isExpanded) {
+			const count = estimateDisplayItemCount(node);
+			const extraBtn = hasMoreButton(node) ? M.MORE_BUTTON_HEIGHT : 0;
+			h += M.ITEMS_TOP_MARGIN + count * M.ITEM_ROW_HEIGHT + extraBtn;
+		}
+		return Math.max(h, 32); // guard minimum
+	}
 
 	function toggleNode(nodeId: string) {
 		const wasExpanded = expandedNodes.has(nodeId);
 		if (wasExpanded) {
 			expandedNodes.delete(nodeId);
 			logger.debug(`[toggleNode] Collapsed node: ${nodeId}`);
+			// Collapse: remove descendants and show only references in parent items
+			const descendants = getDescendantNodeIds(nodeId);
+			if (descendants.size > 0) {
+				const before = nodes.length;
+				nodes = nodes.filter((n) => !descendants.has(n.id));
+				edges = edges.filter((e) => !descendants.has(e.source) && !descendants.has(e.target));
+				logger.debug(`[toggleNode] Removed ${before - nodes.length} descendant nodes`);
+			}
+			// Update parent items to references-only
+			nodes = nodes.map((n) => {
+				if (n.id !== nodeId) return n;
+				const all = n.data?.allItems || [];
+				const refsOnly = all.filter((it) => it.type === 'reference');
+				return { ...n, data: { ...n.data, isExpanded: false, items: refsOnly } } as Node;
+			});
+			// Clear measured heights to force re-estimation
+			measuredHeights.delete(nodeId);
+			for (const id of descendants) measuredHeights.delete(id);
+			// Reflow current graph without full rebuild
+			scheduleReflow();
 		} else {
 			expandedNodes.add(nodeId);
 			logger.debug(`[toggleNode] Expanded node: ${nodeId}`);
+			// Expand: update parent items to allItems and incrementally create children
+			nodes = nodes.map((n) =>
+				n.id === nodeId
+					? { ...n, data: { ...n.data, isExpanded: true, items: n.data?.allItems || [] } }
+					: n
+			);
+			measuredHeights.delete(nodeId);
+			// Incremental subtree creation to avoid full rebuild
+			incrementallyCreateChildren(nodeId);
 		}
 		logger.debug(`[toggleNode] Expanded nodes count: ${expandedNodes.size}`);
-		// Force complete regeneration of the graph
-		regenerateGraph();
+	}
+
+	function getDescendantNodeIds(rootId: string): Set<string> {
+		const childrenMap = new Map<string, string[]>();
+		for (const e of edges) {
+			const arr = childrenMap.get(e.source) || [];
+			arr.push(e.target);
+			childrenMap.set(e.source, arr);
+		}
+		const result = new Set<string>();
+		const stack: string[] = [...(childrenMap.get(rootId) || [])];
+		while (stack.length) {
+			const cur = stack.pop()!;
+			if (result.has(cur)) continue;
+			result.add(cur);
+			const kids = childrenMap.get(cur);
+			if (kids && kids.length) stack.push(...kids);
+		}
+		return result;
+	}
+
+	function getJsonAtPath(root: JsonValue, pathStr: string): JsonValue | null {
+		if (!pathStr) return root;
+		const parts = pathStr.split('.').filter(Boolean);
+		let cur: any = root as any;
+		for (const p of parts) {
+			if (cur == null) return null;
+			if (Array.isArray(cur)) {
+				const idx = Number(p);
+				if (Number.isNaN(idx)) return null;
+				cur = cur[idx];
+			} else if (typeof cur === 'object') {
+				cur = (cur as any)[p];
+			} else {
+				return null;
+			}
+		}
+		return cur as JsonValue;
+	}
+
+	function incrementallyCreateChildren(parentId: string) {
+		const parent = nodes.find((n) => n.id === parentId);
+		if (!parent) {
+			scheduleReflow();
+			return;
+		}
+		const parentPath = parent.data?.path || '';
+		const parentJson = getJsonAtPath(jsonData as JsonValue, parentPath);
+		if (parentJson == null || typeof parentJson !== 'object') {
+			scheduleReflow();
+			return;
+		}
+
+		const nodeShowsAll = showAllItemsNodes.has(parentId);
+		const allItems = parent.data?.allItems || [];
+		const refItems = allItems.filter((it) => it.type === 'reference');
+
+		// Stash global temp arrays while we reuse createCompactGraph
+		const prevTempNodes = tempNodes;
+		const prevTempEdges = tempEdges;
+		tempNodes = [];
+		tempEdges = [];
+
+		refItems.forEach((refItem: any, idx: number) => {
+			const visible = nodeShowsAll || idx < LAYOUT_CONFIG.MAX_DISPLAY_ITEMS;
+			const referenceKey = `${parentId}-${refItem.key}`;
+			const isRefExpanded = expandedReferences.has(referenceKey) || true; // default expanded
+			if (!visible || !isRefExpanded) return;
+			const childId: string = refItem.targetNodeId || `node-${++nodeId}`;
+			const childPath = parentPath ? `${parentPath}.${refItem.key}` : refItem.key;
+			const childJson = getJsonAtPath(jsonData as JsonValue, childPath);
+			// Build subtree starting from this child
+			createCompactGraph(
+				childJson as JsonValue,
+				parentId,
+				refItem.key,
+				0,
+				parentPath ? parentPath.split('.') : [],
+				true,
+				childId
+			);
+			// Connect parent to child with reference edge
+			tempEdges.push({
+				id: `edge-${parentId}-${refItem.key}-${childId}`,
+				source: parentId,
+				sourceHandle: `${parentId}-${refItem.key}`,
+				target: childId,
+				type: 'bezier',
+				animated: false,
+				style: 'stroke: #9ca3af; stroke-width: 1'
+			} as any);
+			expandedReferences.add(referenceKey);
+		});
+
+		// Merge new nodes/edges
+		if (tempNodes.length > 0) {
+			const existing = new Set(nodes.map((n) => n.id));
+			nodes = [...nodes, ...tempNodes.filter((n) => !existing.has(n.id))];
+			edges = [...edges, ...tempEdges];
+		}
+
+		// Restore temp arrays
+		tempNodes = prevTempNodes;
+		tempEdges = prevTempEdges;
+
+		scheduleReflow();
 	}
 
 	function expandAll(nodeId: string) {
@@ -601,9 +795,9 @@
 		}
 	}
 
-    function layoutNodesWithDagre() {
-        logger.debug('[layoutNodesWithDagre] Starting layout with dagre');
-        logger.debug('[layoutNodesWithDagre] Current measured heights count: ' + measuredHeights.size);
+	function layoutNodesWithDagre() {
+		logger.debug('[layoutNodesWithDagre] Starting layout with dagre');
+		logger.debug('[layoutNodesWithDagre] Current measured heights count: ' + measuredHeights.size);
 
 		// Use dagre settings from LAYOUT_CONFIG
 		dagreGraph.setGraph({
@@ -619,22 +813,22 @@
 
 		dagreGraph.nodes().forEach((n) => dagreGraph.removeNode(n));
 
-        const LARGE_GRAPH_THRESHOLD = 200;
-        const DEBUG_SAMPLE_LIMIT = 5;
-        const logNodeDetails = tempNodes.length <= LARGE_GRAPH_THRESHOLD;
-        let loggedNodeDetails = 0;
-        tempNodes.forEach((node) => {
-            let nodeHeight;
-            const nodeWidth = LAYOUT_CONFIG.NODE_WIDTH;
+		const LARGE_GRAPH_THRESHOLD = 200;
+		const DEBUG_SAMPLE_LIMIT = 5;
+		const logNodeDetails = tempNodes.length <= LARGE_GRAPH_THRESHOLD;
+		let loggedNodeDetails = 0;
+		tempNodes.forEach((node) => {
+			let nodeHeight;
+			const nodeWidth = LAYOUT_CONFIG.NODE_WIDTH;
 
-            // Always use measured height first, fallback to initial value
-            const measuredHeight = measuredHeights.get(node.id);
-            if (measuredHeight) {
-                nodeHeight = measuredHeight;
-            } else {
-                // Use estimated value (close to actual) to avoid second layout in most cases
-                nodeHeight = estimateNodeHeight(node);
-            }
+			// Always use measured height first, fallback to initial value
+			const measuredHeight = measuredHeights.get(node.id);
+			if (measuredHeight) {
+				nodeHeight = measuredHeight;
+			} else {
+				// Use estimated value (close to actual) to avoid second layout in most cases
+				nodeHeight = estimateNodeHeight(node);
+			}
 
 			// Set node in dagre - pass only actual height
 			dagreGraph.setNode(node.id, {
@@ -642,22 +836,24 @@
 				height: nodeHeight // Pass only actual height, margins handled by nodesep
 			});
 
-            if (logNodeDetails && loggedNodeDetails < DEBUG_SAMPLE_LIMIT) {
-                const allItemCount = node.data.allItems?.length || 0;
-                const displayItemCount = node.data.items?.length || 0;
-                logger.debug(
-                    `[layoutNodesWithDagre] Node ${node.id} (${node.data.label}): height=${nodeHeight}px (${measuredHeight ? 'measured' : 'estimated'}), expanded=${node.data.isExpanded}, displayItems=${displayItemCount}, allItems=${allItemCount}`
-                );
-                loggedNodeDetails++;
-            }
-        });
+			if (logNodeDetails && loggedNodeDetails < DEBUG_SAMPLE_LIMIT) {
+				const allItemCount = node.data.allItems?.length || 0;
+				const displayItemCount = node.data.items?.length || 0;
+				logger.debug(
+					`[layoutNodesWithDagre] Node ${node.id} (${node.data.label}): height=${nodeHeight}px (${measuredHeight ? 'measured' : 'estimated'}), expanded=${node.data.isExpanded}, displayItems=${displayItemCount}, allItems=${allItemCount}`
+				);
+				loggedNodeDetails++;
+			}
+		});
 
-        if (!logNodeDetails) {
-            logger.debug(`[layoutNodesWithDagre] Nodes=${tempNodes.length}, edges=${tempEdges.length}. Details suppressed (>200).`);
-        } else if (loggedNodeDetails < tempNodes.length) {
-            const omitted = tempNodes.length - loggedNodeDetails;
-            if (omitted > 0) logger.debug(`[layoutNodesWithDagre] ...and ${omitted} more nodes.`);
-        }
+		if (!logNodeDetails) {
+			logger.debug(
+				`[layoutNodesWithDagre] Nodes=${tempNodes.length}, edges=${tempEdges.length}. Details suppressed (>200).`
+			);
+		} else if (loggedNodeDetails < tempNodes.length) {
+			const omitted = tempNodes.length - loggedNodeDetails;
+			if (omitted > 0) logger.debug(`[layoutNodesWithDagre] ...and ${omitted} more nodes.`);
+		}
 
 		tempEdges.forEach((edge) => {
 			dagreGraph.setEdge(edge.source, edge.target);
@@ -749,37 +945,71 @@
 	}
 
 	function regenerateGraph() {
+		if (regenTimer) clearTimeout(regenTimer);
+		regenTimer = window.setTimeout(() => {
+			regenTimer = null;
+			_regenerateGraphNow();
+		}, 150);
+	}
+
+	async function _regenerateGraphNow() {
 		logger.debug('[regenerateGraph] Starting graph regeneration');
+		// Ensure overlay is painted before heavy work
+		graphLoading.set({ active: true, phase: 'build', progress: 0 });
+		// Start a gentle fake progress so the user sees movement during synchronous pre-processing
+		if (fakeProgressTimer) {
+			clearInterval(fakeProgressTimer);
+		}
+		fakeProgressTimer = window.setInterval(() => {
+			let p = 0;
+			graphLoading.update((s) => {
+				p = Math.min(0.3, (s.progress || 0) + 0.02);
+				return { active: true, phase: 'build', progress: p };
+			});
+			if (p >= 0.3 && fakeProgressTimer) {
+				clearInterval(fakeProgressTimer);
+				fakeProgressTimer = null;
+			}
+		}, 150);
+		await tick();
+		await new Promise((r) => requestAnimationFrame(() => r(null)));
 		tempNodes = [];
 		tempEdges = [];
 		nodeId = 0;
 		nodeCallbacks.clear();
 
 		if (jsonData) {
-            try {
-                const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+			try {
+				const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
 
-                createCompactGraph(data, null, 'root', 0, [], false);
+				createCompactGraph(data, null, 'root', 0, [], false);
 
-                // Set expected node count at initial load
-                if (isFirstLoad) {
-                    expectedNodeCount = tempNodes.length;
-                    measuredNodeCount = 0;
-                    initialLoadComplete = false;
+				// Set expected node count at initial load
+				if (isFirstLoad) {
+					expectedNodeCount = tempNodes.length;
+					measuredNodeCount = 0;
+					initialLoadComplete = false;
 					logger.debug(`[regenerateGraph] Initial load: expecting ${expectedNodeCount} nodes`);
-                    isFirstLoad = false;
-                }
+					isFirstLoad = false;
+				}
 
-                // Prefill estimated heights so first real measurements don't trigger reflow
-                tempNodes.forEach((n) => {
-                    if (!measuredHeights.has(n.id)) {
-                        measuredHeights.set(n.id, estimateNodeHeight(n));
-                    }
-                });
+				// Prefill estimated heights so first real measurements don't trigger reflow
+				tempNodes.forEach((n) => {
+					if (!measuredHeights.has(n.id)) {
+						measuredHeights.set(n.id, estimateNodeHeight(n));
+					}
+				});
 
-				// Apply dagre layout
-				logger.debug(`{regenerateGraph] Created ${tempNodes.length} nodes, ${tempEdges.length} edges`);
-				layoutNodesWithDagre();
+				// Apply dagre layout (always use worker to enable progress updates)
+				logger.debug(
+					`{regenerateGraph] Created ${tempNodes.length} nodes, ${tempEdges.length} edges`
+				);
+				try {
+					await performLayoutWithWorker();
+				} catch (err) {
+					logger.error('Worker layout failed, falling back to main thread:', err);
+					layoutNodesWithDagre();
+				}
 
 				// items are already properly set in createCompactGraph, no additional filtering needed
 
@@ -787,74 +1017,39 @@
 				nodes = [...tempNodes];
 				edges = [...tempEdges];
 				logger.debug(`[regenerateGraph] Graph regeneration complete`);
+				graphLoading.set({ active: false, phase: 'idle', progress: 0 });
+				if (fakeProgressTimer) {
+					clearInterval(fakeProgressTimer);
+					fakeProgressTimer = null;
+				}
 			} catch (e) {
 				logger.error('Invalid JSON:', e);
 				nodes = [];
 				edges = [];
+				graphLoading.set({ active: false, phase: 'idle', progress: 0 });
+				if (fakeProgressTimer) {
+					clearInterval(fakeProgressTimer);
+					fakeProgressTimer = null;
+				}
 			}
 		} else {
 			nodes = [];
 			edges = [];
+			graphLoading.set({ active: false, phase: 'idle', progress: 0 });
+			if (fakeProgressTimer) {
+				clearInterval(fakeProgressTimer);
+				fakeProgressTimer = null;
+			}
 		}
 	}
 
 	$effect(() => {
-		// Check if jsonData has changed
 		if (previousJsonData === null) {
-			// Initial load
 			previousJsonData = jsonData;
 			regenerateGraph();
 			return;
 		}
-
-		// First check if the entire JSON is completely different (like URL fetch or paste)
-		const jsonString = JSON.stringify(jsonData);
-		const previousString = JSON.stringify(previousJsonData);
-
-		if (jsonString === previousString) {
-			// No change at all
-			return;
-		}
-
-		// Check for structural changes
-		const oldStructure = getJsonStructure(previousJsonData);
-		const newStructure = getJsonStructure(jsonData);
-		const isStructuralChange = hasStructuralChange(oldStructure, newStructure);
-
-		// Also consider it a major change if the root keys are completely different
-		// For arrays, check if one is array and other is not
-		const oldIsArray = Array.isArray(previousJsonData);
-		const newIsArray = Array.isArray(jsonData);
-
-		let rootKeysChanged = false;
-		if (oldIsArray !== newIsArray) {
-			// Type change between array and object
-			rootKeysChanged = true;
-		} else if (!oldIsArray && !newIsArray) {
-			// Both are objects, compare keys
-			const oldRootKeys =
-				previousJsonData && typeof previousJsonData === 'object'
-					? Object.keys(previousJsonData).sort().join(',')
-					: '';
-			const newRootKeys =
-				jsonData && typeof jsonData === 'object' ? Object.keys(jsonData).sort().join(',') : '';
-			rootKeysChanged = oldRootKeys !== newRootKeys;
-		}
-
-		if (isStructuralChange || rootKeysChanged) {
-			// Major structural change - reset all expansion states
-			logger.debug('[JsonGraph] Structural change detected, resetting expansion states');
-			expandedNodes.clear();
-			expandedReferences.clear();
-			showAllItemsNodes.clear();
-			isFirstLoad = true;
-			previousJsonData = jsonData;
-		} else {
-			// Only values changed - preserve expansion states
-			logger.debug('[JsonGraph] Value change detected, preserving expansion states');
-			previousJsonData = jsonData;
-		}
-
+		previousJsonData = jsonData;
 		regenerateGraph();
 	});
 
@@ -893,30 +1088,35 @@
 				showAllItemsNodes.delete(nodeId);
 			}
 			logger.debug(`[handleShowAllToggle] Node ${nodeId} showAll: ${showAll}`);
-			regenerateGraph();
+			// Only height changes; no need to rebuild the graph
+			measuredHeights.delete(nodeId);
+			scheduleReflow();
 		};
 
-        const handleNodeHeightMeasured = (e: CustomEvent) => {
-            const { nodeId, actualHeight } = e.detail;
-            const previousHeight = measuredHeights.get(nodeId);
+		const handleNodeHeightMeasured = (e: CustomEvent) => {
+			const { nodeId, actualHeight } = e.detail;
+			const previousHeight = measuredHeights.get(nodeId);
 
-            measuredHeights.set(nodeId, actualHeight);
+			measuredHeights.set(nodeId, actualHeight);
 
-            // Re-layout only when height has changed or measured for the first time
-            const diff = previousHeight !== undefined ? Math.abs(previousHeight - actualHeight) : Infinity;
-            // Only reflow if difference exceeds 1px to avoid redundant second draw
-            if (diff > 1) {
-                logger.debug(
-                    `[handleNodeHeightMeasured] Height changed for ${nodeId}: ${previousHeight || 'initial'} -> ${actualHeight}px (diff=${diff})`
-                );
-                scheduleReflow();
-            }
+			// Re-layout only when height has changed or measured for the first time
+			const diff =
+				previousHeight !== undefined ? Math.abs(previousHeight - actualHeight) : Infinity;
+			// Only reflow if difference exceeds 1px to avoid redundant second draw
+			if (diff > 1) {
+				logger.debug(
+					`[handleNodeHeightMeasured] Height changed for ${nodeId}: ${previousHeight || 'initial'} -> ${actualHeight}px (diff=${diff})`
+				);
+				scheduleReflow();
+			}
 
 			// Track initial load
 			if (!initialLoadComplete && previousHeight === undefined) {
 				measuredNodeCount++;
 				if (measuredNodeCount >= expectedNodeCount && expectedNodeCount > 0) {
-					logger.debug(`[handleNodeHeightMeasured] Initial load complete: ${measuredNodeCount} nodes measured`);
+					logger.debug(
+						`[handleNodeHeightMeasured] Initial load complete: ${measuredNodeCount} nodes measured`
+					);
 					initialLoadComplete = true;
 				}
 			}
@@ -949,7 +1149,10 @@
 </script>
 
 <SvelteFlowProvider>
-	<div class="h-full {className}" style="background-color: var(--color-background);">
+	<div
+		class="h-full {className}"
+		style="background-color: var(--color-background); position: relative;"
+	>
 		<SvelteFlow
 			{nodes}
 			{edges}
@@ -965,6 +1168,13 @@
 			<Background variant={'dots' as BackgroundVariant} />
 			<MiniMap />
 		</SvelteFlow>
+
+		{#if $graphLoading.active}
+			<div class="graph-loading-overlay" aria-live="polite" aria-busy="true">
+				<div class="spinner"></div>
+				<div class="text">Loading</div>
+			</div>
+		{/if}
 	</div>
 </SvelteFlowProvider>
 
@@ -1050,5 +1260,38 @@
 
 	:global(.svelte-flow__attribution) {
 		display: none;
+	}
+
+	.graph-loading-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		background: color-mix(in oklab, var(--color-background) 70%, transparent);
+		pointer-events: none;
+		z-index: 1000;
+	}
+
+	.spinner {
+		width: 18px;
+		height: 18px;
+		border: 2px solid var(--color-border);
+		border-top-color: var(--color-foreground);
+		border-radius: 50%;
+		animation: spin 0.9s linear infinite;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

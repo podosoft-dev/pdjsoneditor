@@ -345,9 +345,12 @@
 		}
 
 		// Set new timeout for 500ms delay
-		parseTimeout = setTimeout(() => {
+		parseTimeout = setTimeout(async () => {
 			// console.log('[Page Effect] Parsing JSON after timeout');
 			try {
+				// Activate graph loading overlay before parsing to improve perceived responsiveness with large inputs
+				const mod = await import('$lib/stores/graphLoading');
+				mod.graphLoading.set({ active: true, phase: 'build', progress: 0 });
 				parsedJson = JSON.parse(currentJsonValue);
 				error = '';
 			} catch (e) {
