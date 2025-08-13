@@ -27,10 +27,11 @@
 	import { mode, toggleMode } from 'mode-watcher';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import LL from '$i18n/i18n-svelte';
-    import { toast } from 'svelte-sonner';
-    import type { JsonValue } from '$lib/types/json';
-    import { STORAGE_KEYS } from '$lib/constants';
-    import { requestJson, type HttpMethod } from '$lib/services/http';
+	import { toast } from 'svelte-sonner';
+	import type { JsonValue } from '$lib/types/json';
+	import { STORAGE_KEYS } from '$lib/constants';
+	import { requestJson, type HttpMethod } from '$lib/services/http';
+	import { logger } from '$lib/logger';
 
 	// 	let jsonValue = $state(`{
 	//   "name": "John Doe",
@@ -216,7 +217,7 @@
 			await navigator.clipboard.writeText(jsonValue);
 			toast.success($LL.header.copySuccess());
 		} catch (e) {
-			console.error('Failed to copy to clipboard:', e);
+			logger.error('Failed to copy to clipboard:', e);
 			// Fallback for older browsers
 			try {
 				const textArea = document.createElement('textarea');
@@ -228,7 +229,7 @@
 				document.body.removeChild(textArea);
 				toast.success($LL.header.copySuccess());
 			} catch (fallbackError) {
-				console.error('Fallback copy failed:', fallbackError);
+				logger.error('Fallback copy failed:', fallbackError);
 				toast.error($LL.header.copyError());
 			}
 		}
@@ -388,7 +389,7 @@
 					customHeaders = [];
 				}
 			} catch (e) {
-				console.error('Failed to parse saved headers:', e);
+				logger.error('Failed to parse saved headers:', e);
 				// Keep empty on error
 				customHeaders = [];
 			}
@@ -405,7 +406,7 @@
 			try {
 				sendAsRawText = JSON.parse(savedRawBodyMode);
 			} catch (e) {
-				console.error('Failed to parse saved raw body mode:', e);
+				logger.error('Failed to parse saved raw body mode:', e);
 				sendAsRawText = false;
 			}
 		}
@@ -414,7 +415,7 @@
 			try {
 				useEditorContent = JSON.parse(savedUseEditorContent);
 			} catch (e) {
-				console.error('Failed to parse saved use editor content:', e);
+				logger.error('Failed to parse saved use editor content:', e);
 				useEditorContent = false;
 			}
 		}

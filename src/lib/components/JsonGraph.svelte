@@ -16,6 +16,7 @@
 	import FitViewController from './FitViewController.svelte';
 	import dagre from 'dagre';
 	import { mode } from 'mode-watcher';
+	import { logger } from '$lib/logger';
 	import type { JsonValue, JsonObject, NodeItem, JsonStructure } from '$lib/types/json';
 
 	interface Props {
@@ -177,26 +178,26 @@
 
 	function scheduleReflow() {
 		if (reflowScheduled) {
-			console.log('[scheduleReflow] Already scheduled, skipping');
+			logger.debug('[scheduleReflow] Already scheduled, skipping');
 			return;
 		}
 		reflowScheduled = true;
-		console.log('[scheduleReflow] Scheduling reflow');
+		logger.debug('[scheduleReflow] Scheduling reflow');
 		requestAnimationFrame(() => {
 			reflowScheduled = false;
-			console.log('[scheduleReflow] Executing reflow');
+			logger.debug('[scheduleReflow] Executing reflow');
 			reflowWithMeasuredHeights();
 		});
 	}
 
-	function reflowWithMeasuredHeights() {
-		if (!nodes || nodes.length === 0) {
-			console.log('[reflowWithMeasuredHeights] No nodes to reflow');
-			return;
-		}
+    function reflowWithMeasuredHeights() {
+        if (!nodes || nodes.length === 0) {
+            logger.debug('[reflowWithMeasuredHeights] No nodes to reflow');
+            return;
+        }
 
-		console.log('[reflowWithMeasuredHeights] Starting reflow with', nodes.length, 'nodes');
-		console.log('[reflowWithMeasuredHeights] Measured heights:', [...measuredHeights.entries()]);
+        logger.debug('[reflowWithMeasuredHeights] Starting reflow with ' + nodes.length + ' nodes');
+        logger.debug('[reflowWithMeasuredHeights] Measured heights count: ' + measuredHeights.size);
 
 		// Clone current state and re-run dagre using measured heights
 		tempNodes = nodes.map((n) => ({ ...n }));
@@ -207,7 +208,7 @@
 		// Keep current display state; only positions are updated
 		nodes = [...tempNodes];
 		edges = [...tempEdges];
-		console.log('[reflowWithMeasuredHeights] Reflow complete');
+		logger.debug('[reflowWithMeasuredHeights] Reflow complete');
 	}
 
 	// Temporary arrays for building the graph
@@ -221,10 +222,20 @@
 	let nodeId = 0;
 
 	// ============ Layout Configuration ============
-	const LAYOUT_CONFIG = {
-		// Node size
-		NODE_WIDTH: 280,
-		INITIAL_HEIGHT: 100, // Initial height before measurement
+    const LAYOUT_CONFIG = {
+        // Node size
+        NODE_WIDTH: 280,
+        INITIAL_HEIGHT: 100, // Fallback height (should rarely be used)
+
+        // Estimated layout metrics (keep in sync with CompactNode.svelte CSS)
+        METRICS: {
+            NODE_PADDING_Y: 16, // .compact-node padding 8px top/bottom => 16
+            NODE_BORDER_Y: 2,   // .compact-node border 1px top/bottom => 2
+            HEADER_HEIGHT: 20,  // .node-header min-height
+            ITEMS_TOP_MARGIN: 4, // .node-items margin-top
+            ITEM_ROW_HEIGHT: 24, // .item fixed height
+            MORE_BUTTON_HEIGHT: 24 // .more-items-btn height
+        },
 
 		// dagre layout settings
 		DAGRE: {
@@ -253,20 +264,47 @@
 	dagreGraph.setDefaultEdgeLabel(() => ({}));
 
 	// Initial node height (used until actual measurements arrive)
-	function getInitialNodeHeight(): number {
-		return LAYOUT_CONFIG.INITIAL_HEIGHT;
-	}
+    function getInitialNodeHeight(): number {
+        return LAYOUT_CONFIG.INITIAL_HEIGHT;
+    }
+
+    function estimateDisplayItemCount(node: Node): number {
+        if (!node.data?.isExpanded) return 0;
+        const total = node.data.items?.length ?? 0;
+        const nodeShowsAll = showAllItemsNodes.has(node.id);
+        if (nodeShowsAll) return total;
+        return Math.min(total, LAYOUT_CONFIG.MAX_DISPLAY_ITEMS);
+    }
+
+    function hasMoreButton(node: Node): boolean {
+        if (!node.data?.isExpanded) return false;
+        const total = node.data.items?.length ?? 0;
+        const nodeShowsAll = showAllItemsNodes.has(node.id);
+        return total > LAYOUT_CONFIG.MAX_DISPLAY_ITEMS && !nodeShowsAll;
+    }
+
+    function estimateNodeHeight(node: Node): number {
+        const M = LAYOUT_CONFIG.METRICS;
+        // base = vertical padding + header
+        let h = M.NODE_PADDING_Y + M.NODE_BORDER_Y + M.HEADER_HEIGHT;
+        if (node.data?.isExpanded) {
+            const count = estimateDisplayItemCount(node);
+            const extraBtn = hasMoreButton(node) ? M.MORE_BUTTON_HEIGHT : 0;
+            h += M.ITEMS_TOP_MARGIN + count * M.ITEM_ROW_HEIGHT + extraBtn;
+        }
+        return Math.max(h, 32); // guard minimum
+    }
 
 	function toggleNode(nodeId: string) {
 		const wasExpanded = expandedNodes.has(nodeId);
 		if (wasExpanded) {
 			expandedNodes.delete(nodeId);
-			console.log(`[toggleNode] Collapsed node: ${nodeId}`);
+			logger.debug(`[toggleNode] Collapsed node: ${nodeId}`);
 		} else {
 			expandedNodes.add(nodeId);
-			console.log(`[toggleNode] Expanded node: ${nodeId}`);
+			logger.debug(`[toggleNode] Expanded node: ${nodeId}`);
 		}
-		console.log(`[toggleNode] Current expanded nodes:`, [...expandedNodes]);
+		logger.debug(`[toggleNode] Expanded nodes count: ${expandedNodes.size}`);
 		// Force complete regeneration of the graph
 		regenerateGraph();
 	}
@@ -563,9 +601,9 @@
 		}
 	}
 
-	function layoutNodesWithDagre() {
-		console.log('[layoutNodesWithDagre] Starting layout with dagre');
-		console.log('[layoutNodesWithDagre] Current measured heights:', [...measuredHeights.entries()]);
+    function layoutNodesWithDagre() {
+        logger.debug('[layoutNodesWithDagre] Starting layout with dagre');
+        logger.debug('[layoutNodesWithDagre] Current measured heights count: ' + measuredHeights.size);
 
 		// Use dagre settings from LAYOUT_CONFIG
 		dagreGraph.setGraph({
@@ -581,18 +619,22 @@
 
 		dagreGraph.nodes().forEach((n) => dagreGraph.removeNode(n));
 
-		tempNodes.forEach((node) => {
-			let nodeHeight;
-			const nodeWidth = LAYOUT_CONFIG.NODE_WIDTH;
+        const LARGE_GRAPH_THRESHOLD = 200;
+        const DEBUG_SAMPLE_LIMIT = 5;
+        const logNodeDetails = tempNodes.length <= LARGE_GRAPH_THRESHOLD;
+        let loggedNodeDetails = 0;
+        tempNodes.forEach((node) => {
+            let nodeHeight;
+            const nodeWidth = LAYOUT_CONFIG.NODE_WIDTH;
 
-			// Always use measured height first, fallback to initial value
-			const measuredHeight = measuredHeights.get(node.id);
-			if (measuredHeight) {
-				nodeHeight = measuredHeight;
-			} else {
-				// Use initial value if no measurement (will be replaced soon)
-				nodeHeight = getInitialNodeHeight();
-			}
+            // Always use measured height first, fallback to initial value
+            const measuredHeight = measuredHeights.get(node.id);
+            if (measuredHeight) {
+                nodeHeight = measuredHeight;
+            } else {
+                // Use estimated value (close to actual) to avoid second layout in most cases
+                nodeHeight = estimateNodeHeight(node);
+            }
 
 			// Set node in dagre - pass only actual height
 			dagreGraph.setNode(node.id, {
@@ -600,20 +642,29 @@
 				height: nodeHeight // Pass only actual height, margins handled by nodesep
 			});
 
-			// Debug log
-			const allItemCount = node.data.allItems?.length || 0;
-			const displayItemCount = node.data.items?.length || 0;
-			console.log(
-				`[layoutNodesWithDagre] Node ${node.id} (${node.data.label}): height=${nodeHeight}px (${measuredHeight ? 'measured' : 'initial'}), expanded=${node.data.isExpanded}, displayItems=${displayItemCount}, allItems=${allItemCount}`
-			);
-		});
+            if (logNodeDetails && loggedNodeDetails < DEBUG_SAMPLE_LIMIT) {
+                const allItemCount = node.data.allItems?.length || 0;
+                const displayItemCount = node.data.items?.length || 0;
+                logger.debug(
+                    `[layoutNodesWithDagre] Node ${node.id} (${node.data.label}): height=${nodeHeight}px (${measuredHeight ? 'measured' : 'estimated'}), expanded=${node.data.isExpanded}, displayItems=${displayItemCount}, allItems=${allItemCount}`
+                );
+                loggedNodeDetails++;
+            }
+        });
+
+        if (!logNodeDetails) {
+            logger.debug(`[layoutNodesWithDagre] Nodes=${tempNodes.length}, edges=${tempEdges.length}. Details suppressed (>200).`);
+        } else if (loggedNodeDetails < tempNodes.length) {
+            const omitted = tempNodes.length - loggedNodeDetails;
+            if (omitted > 0) logger.debug(`[layoutNodesWithDagre] ...and ${omitted} more nodes.`);
+        }
 
 		tempEdges.forEach((edge) => {
 			dagreGraph.setEdge(edge.source, edge.target);
 		});
 
 		dagre.layout(dagreGraph);
-		console.log('[layoutNodesWithDagre] Dagre layout complete');
+		logger.debug('[layoutNodesWithDagre] Dagre layout complete');
 
 		// Center alignment and position adjustment
 		tempNodes = tempNodes.map((node) => {
@@ -693,36 +744,41 @@
 		});
 
 		if (overlapAdjustments > 0) {
-			console.log(`[layoutNodesWithDagre] Adjusted ${overlapAdjustments} overlapping nodes`);
+			logger.debug(`[layoutNodesWithDagre] Adjusted ${overlapAdjustments} overlapping nodes`);
 		}
 	}
 
 	function regenerateGraph() {
-		console.log('[regenerateGraph] Starting graph regeneration');
+		logger.debug('[regenerateGraph] Starting graph regeneration');
 		tempNodes = [];
 		tempEdges = [];
 		nodeId = 0;
 		nodeCallbacks.clear();
 
 		if (jsonData) {
-			try {
-				const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+            try {
+                const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
 
-				createCompactGraph(data, null, 'root', 0, [], false);
+                createCompactGraph(data, null, 'root', 0, [], false);
 
-				// Set expected node count at initial load
-				if (isFirstLoad) {
-					expectedNodeCount = tempNodes.length;
-					measuredNodeCount = 0;
-					initialLoadComplete = false;
-					console.log(`[regenerateGraph] Initial load: expecting ${expectedNodeCount} nodes`);
-					isFirstLoad = false;
-				}
+                // Set expected node count at initial load
+                if (isFirstLoad) {
+                    expectedNodeCount = tempNodes.length;
+                    measuredNodeCount = 0;
+                    initialLoadComplete = false;
+					logger.debug(`[regenerateGraph] Initial load: expecting ${expectedNodeCount} nodes`);
+                    isFirstLoad = false;
+                }
+
+                // Prefill estimated heights so first real measurements don't trigger reflow
+                tempNodes.forEach((n) => {
+                    if (!measuredHeights.has(n.id)) {
+                        measuredHeights.set(n.id, estimateNodeHeight(n));
+                    }
+                });
 
 				// Apply dagre layout
-				console.log(
-					`[regenerateGraph] Created ${tempNodes.length} nodes, ${tempEdges.length} edges`
-				);
+				logger.debug(`{regenerateGraph] Created ${tempNodes.length} nodes, ${tempEdges.length} edges`);
 				layoutNodesWithDagre();
 
 				// items are already properly set in createCompactGraph, no additional filtering needed
@@ -730,9 +786,9 @@
 				// Update state arrays all at once
 				nodes = [...tempNodes];
 				edges = [...tempEdges];
-				console.log(`[regenerateGraph] Graph regeneration complete`);
+				logger.debug(`[regenerateGraph] Graph regeneration complete`);
 			} catch (e) {
-				console.error('Invalid JSON:', e);
+				logger.error('Invalid JSON:', e);
 				nodes = [];
 				edges = [];
 			}
@@ -787,7 +843,7 @@
 
 		if (isStructuralChange || rootKeysChanged) {
 			// Major structural change - reset all expansion states
-			console.log('[JsonGraph] Structural change detected, resetting expansion states');
+			logger.debug('[JsonGraph] Structural change detected, resetting expansion states');
 			expandedNodes.clear();
 			expandedReferences.clear();
 			showAllItemsNodes.clear();
@@ -795,7 +851,7 @@
 			previousJsonData = jsonData;
 		} else {
 			// Only values changed - preserve expansion states
-			console.log('[JsonGraph] Value change detected, preserving expansion states');
+			logger.debug('[JsonGraph] Value change detected, preserving expansion states');
 			previousJsonData = jsonData;
 		}
 
@@ -836,31 +892,31 @@
 			} else {
 				showAllItemsNodes.delete(nodeId);
 			}
-			console.log(`[handleShowAllToggle] Node ${nodeId} showAll: ${showAll}`);
+			logger.debug(`[handleShowAllToggle] Node ${nodeId} showAll: ${showAll}`);
 			regenerateGraph();
 		};
 
-		const handleNodeHeightMeasured = (e: CustomEvent) => {
-			const { nodeId, actualHeight } = e.detail;
-			const previousHeight = measuredHeights.get(nodeId);
+        const handleNodeHeightMeasured = (e: CustomEvent) => {
+            const { nodeId, actualHeight } = e.detail;
+            const previousHeight = measuredHeights.get(nodeId);
 
-			measuredHeights.set(nodeId, actualHeight);
+            measuredHeights.set(nodeId, actualHeight);
 
-			// Re-layout only when height has changed or measured for the first time
-			if (previousHeight !== actualHeight) {
-				console.log(
-					`[handleNodeHeightMeasured] Height changed for ${nodeId}: ${previousHeight || 'initial'} -> ${actualHeight}px`
-				);
-				scheduleReflow();
-			}
+            // Re-layout only when height has changed or measured for the first time
+            const diff = previousHeight !== undefined ? Math.abs(previousHeight - actualHeight) : Infinity;
+            // Only reflow if difference exceeds 1px to avoid redundant second draw
+            if (diff > 1) {
+                logger.debug(
+                    `[handleNodeHeightMeasured] Height changed for ${nodeId}: ${previousHeight || 'initial'} -> ${actualHeight}px (diff=${diff})`
+                );
+                scheduleReflow();
+            }
 
 			// Track initial load
 			if (!initialLoadComplete && previousHeight === undefined) {
 				measuredNodeCount++;
 				if (measuredNodeCount >= expectedNodeCount && expectedNodeCount > 0) {
-					console.log(
-						`[handleNodeHeightMeasured] Initial load complete: ${measuredNodeCount} nodes measured`
-					);
+					logger.debug(`[handleNodeHeightMeasured] Initial load complete: ${measuredNodeCount} nodes measured`);
 					initialLoadComplete = true;
 				}
 			}

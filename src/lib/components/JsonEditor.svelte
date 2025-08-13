@@ -5,6 +5,7 @@
 	import { json } from '@codemirror/lang-json';
 	import { oneDark } from '@codemirror/theme-one-dark';
 	import { mode } from 'mode-watcher';
+	import { logger } from '$lib/logger';
 
 	interface Props {
 		value: string;
@@ -41,7 +42,7 @@
 			});
 			view.focus();
 		} catch (e) {
-			console.error('Failed to navigate to path:', e);
+			logger.error('Failed to navigate to path:', e);
 		}
 	}
 

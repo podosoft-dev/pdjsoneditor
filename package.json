@@ -69,6 +69,7 @@
 		"lucide-svelte": "^0.536.0",
 		"mode-watcher": "^1.1.0",
 		"tailwind-merge": "^3.3.1",
-		"typesafe-i18n": "^5.26.2"
+		"typesafe-i18n": "^5.26.2",
+		"tslog": "^4.9.3"
 	}
 }

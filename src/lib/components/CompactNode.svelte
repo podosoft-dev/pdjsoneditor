@@ -9,6 +9,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { onMount, onDestroy } from 'svelte';
 	import LL from '$i18n/i18n-svelte';
+	import { logger } from '$lib/logger';
 	import type { NodeItem } from '$lib/types/json';
 
 	interface Props {
@@ -80,7 +81,7 @@
 
 	function handleToggle() {
 		if (data.nodeId) {
-			console.log(`[CompactNode] Toggle button clicked for node ${data.nodeId}`);
+			logger.debug(`[CompactNode] Toggle button clicked for node ${data.nodeId}`);
 			window.dispatchEvent(new CustomEvent('nodeToggle', { detail: data.nodeId }));
 		}
 	}
@@ -99,13 +100,13 @@
 
 	function handleReferenceToggle(itemKey: string) {
 		const referenceKey = `${id}-${itemKey}`;
-		console.log(`[CompactNode] Reference toggle clicked for ${referenceKey}`);
+		logger.debug(`[CompactNode] Reference toggle clicked for ${referenceKey}`);
 		window.dispatchEvent(new CustomEvent('referenceToggle', { detail: referenceKey }));
 	}
 
 	function toggleShowAll() {
 		showAllItems = !showAllItems;
-		console.log(
+		logger.debug(
 			`[CompactNode] Toggle show all for ${id} (${data.label}): ${showAllItems}, total items: ${data.items?.length}`
 		);
 
@@ -125,7 +126,7 @@
 		ro = new ResizeObserver((entries) => {
 			const entry = entries[0];
 			const resizeHeight = entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height;
-			console.log(`[CompactNode] Height measured for ${id} (${data.label}): ${resizeHeight}px`);
+			// noisy across many nodes; rely on JsonGraph handler for sampled logs
 
 			window.dispatchEvent(
 				new CustomEvent('nodeHeightMeasured', {
@@ -336,6 +337,8 @@
 		align-items: center;
 		gap: 4px;
 		white-space: nowrap;
+		min-height: 20px; /* keep in sync with JsonGraph METRICS.HEADER_HEIGHT */
+		line-height: 20px;
 	}
 
 	.toggle-btn {
@@ -455,6 +458,8 @@
 		text-align: left;
 		border-radius: 2px;
 		transition: background-color 0.2s;
+		height: 24px; /* keep in sync with JsonGraph METRICS.ITEM_ROW_HEIGHT */
+		box-sizing: border-box;
 	}
 
 	.item:hover {
@@ -493,6 +498,8 @@
 		align-items: center;
 		gap: 4px;
 		width: 100%;
+		height: 24px; /* keep in sync with JsonGraph METRICS.MORE_BUTTON_HEIGHT */
+		box-sizing: border-box;
 		padding: 4px 8px;
 		margin-top: 4px;
 		font-size: 12px;
