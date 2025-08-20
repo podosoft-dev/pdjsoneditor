@@ -1,6 +1,6 @@
 # PDJsonEditor
 
-*[한국어](README-ko.md)*
+_[한국어](README-ko.md)_
 
 A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5. View and edit JSON data simultaneously in both code editor and interactive graph views.
 
@@ -11,18 +11,21 @@ A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5
 ## ✨ Features
 
 ### 📝 Advanced JSON Editor
+
 - **Syntax Highlighting**: CodeMirror-powered editor with JSON syntax highlighting
 - **Real-time Validation**: Instant JSON syntax validation and error reporting
 - **Format & Minify**: One-click JSON formatting and minification
 - **Navigation**: Click on graph nodes to jump to corresponding JSON location
 
 ### 🔗 HTTP Request Integration
+
 - **Multi-Method Support**: GET, POST, PUT, DELETE, PATCH requests
 - **Custom Headers**: Add and manage HTTP headers
 - **Request Body**: Configure custom request bodies for POST/PUT/PATCH
 - **URL Import**: Fetch JSON data directly from URLs
 
 ### 📊 Interactive Graph Visualization
+
 - **Tree Structure**: Visualize JSON as an interactive tree graph
 - **Compact Nodes**: Compact display grouping primitive values
 - **Expand/Collapse**: Toggle node expansion with visual indicators
@@ -30,12 +33,14 @@ A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5
 - **Auto Layout**: Dagre-powered automatic graph layout
 
 ### 🎯 Smart Node Display
+
 - **Grouped Primitives**: Primitive values grouped in parent nodes for clarity
 - **Reference Types**: Objects and arrays shown as references (e.g., `address {3}`, `hobbies [3]`)
 - **Show More**: Automatically collapse nodes with 20+ items with "show more" functionality
 - **Individual Toggles**: Expand/collapse individual reference items
 
 ### 🌐 Internationalization
+
 - **Multi-language**: English and Korean support
 - **Language Switcher**: Easy language switching in header
 - **Persistent Settings**: Language preference saved in localStorage
@@ -43,28 +48,33 @@ A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js v20.19 or higher
 - npm or yarn package manager
 
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/podosoft-dev/pdjsoneditor.git
 cd pdjsoneditor
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Start development server**
+
 ```bash
 npm run dev
 ```
 
 4. **Open in browser**
+
 ```
 http://localhost:5173
 ```
@@ -141,11 +151,12 @@ services:
     image: ghcr.io/podosoft-dev/pdjsoneditor:latest
     container_name: pdjsoneditor
     ports:
-      - "3000:3000"
+      - '3000:3000'
     restart: unless-stopped
 ```
 
 Then run:
+
 ```bash
 docker-compose up -d
 ```
@@ -155,17 +166,20 @@ Access the application at `http://localhost:3000`
 ## 📖 Usage
 
 ### Basic JSON Editing
+
 1. **Paste or type JSON** in the left editor panel
 2. **View the structure** in the right graph panel
 3. **Navigate between views** by clicking nodes or using the editor
 
 ### Fetching Data from URLs
+
 1. **Select HTTP method** from the dropdown (GET, POST, PUT, DELETE, PATCH)
 2. **Enter the URL** in the input field
 3. **Configure headers and body** using the Settings button (optional)
 4. **Click "Go"** to fetch and load the JSON data
 
 ### Graph Interaction
+
 - **Expand/Collapse**: Click the colored handles on nodes
 - **Show More**: Click "Show more" on nodes with many items
 - **Navigate**: Click nodes to jump to corresponding JSON location

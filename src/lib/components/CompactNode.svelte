@@ -155,7 +155,9 @@
 			type="target"
 			position={Position.Left}
 			class="!w-1.5 !h-1.5"
-			style="left: -3px; background-color: {mode.current === 'dark' ? '#6b7280' : '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
+			style="left: -3px; background-color: {mode.current === 'dark'
+				? '#6b7280'
+				: '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
 		/>
 	{/if}
 
@@ -247,10 +249,18 @@
 										id={`${id}-${item.key}`}
 										class="!w-2.5 !h-2.5 item-handle"
 										style="position: relative; background-color: {item.isReferenceExpanded
-											? (mode.current === 'dark' ? '#10b981' : '#059669')
-											: (mode.current === 'dark' ? '#6b7280' : '#9ca3af')}; border-color: {item.isReferenceExpanded
-											? (mode.current === 'dark' ? '#059669' : '#047857')
-											: (mode.current === 'dark' ? '#4b5563' : '#6b7280')};"
+											? mode.current === 'dark'
+												? '#10b981'
+												: '#059669'
+											: mode.current === 'dark'
+												? '#6b7280'
+												: '#9ca3af'}; border-color: {item.isReferenceExpanded
+											? mode.current === 'dark'
+												? '#059669'
+												: '#047857'
+											: mode.current === 'dark'
+												? '#4b5563'
+												: '#6b7280'};"
 									/>
 								</button>
 							{/if}
@@ -310,7 +320,9 @@
 			type="source"
 			position={Position.Right}
 			class="!w-1.5 !h-1.5"
-			style="right: -3px; background-color: {mode.current === 'dark' ? '#6b7280' : '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
+			style="right: -3px; background-color: {mode.current === 'dark'
+				? '#6b7280'
+				: '#9ca3af'}; border-color: {mode.current === 'dark' ? '#4b5563' : '#6b7280'};"
 		/>
 	{/if}
 </div>
@@ -521,5 +533,4 @@
 		color: var(--color-foreground);
 		border-color: var(--color-muted-foreground);
 	}
-
 </style>

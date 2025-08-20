@@ -13,31 +13,31 @@ const sampleData = {
 	users: [
 		{
 			id: 1,
-			name: "John Doe",
-			email: "john@example.com",
+			name: 'John Doe',
+			email: 'john@example.com',
 			age: 30,
 			active: true,
 			profile: {
-				bio: "Software Developer",
-				location: "San Francisco",
-				interests: ["coding", "reading", "hiking"]
+				bio: 'Software Developer',
+				location: 'San Francisco',
+				interests: ['coding', 'reading', 'hiking']
 			}
 		},
 		{
 			id: 2,
-			name: "Jane Smith",
-			email: "jane@example.com",
+			name: 'Jane Smith',
+			email: 'jane@example.com',
 			age: 28,
 			active: false,
 			profile: {
-				bio: "Product Designer",
-				location: "New York",
-				interests: ["design", "photography", "travel"]
+				bio: 'Product Designer',
+				location: 'New York',
+				interests: ['design', 'photography', 'travel']
 			}
 		}
 	],
 	metadata: {
-		version: "1.0.0",
+		version: '1.0.0',
 		timestamp: new Date().toISOString(),
 		totalUsers: 2
 	}
@@ -48,27 +48,27 @@ const productsData = {
 	products: [
 		{
 			id: 101,
-			name: "Laptop Pro",
+			name: 'Laptop Pro',
 			price: 1299.99,
 			stock: 15,
-			categories: ["Electronics", "Computers"],
+			categories: ['Electronics', 'Computers'],
 			specifications: {
-				cpu: "Intel Core i7",
-				ram: "16GB",
-				storage: "512GB SSD",
-				display: "15.6 inch"
+				cpu: 'Intel Core i7',
+				ram: '16GB',
+				storage: '512GB SSD',
+				display: '15.6 inch'
 			}
 		},
 		{
 			id: 102,
-			name: "Wireless Mouse",
+			name: 'Wireless Mouse',
 			price: 29.99,
 			stock: 50,
-			categories: ["Electronics", "Accessories"],
+			categories: ['Electronics', 'Accessories'],
 			specifications: {
-				connectivity: "Bluetooth 5.0",
-				battery: "AA x 2",
-				dpi: "1600"
+				connectivity: 'Bluetooth 5.0',
+				battery: 'AA x 2',
+				dpi: '1600'
 			}
 		}
 	]
@@ -77,34 +77,34 @@ const productsData = {
 // Complex nested structure for testing
 const complexData = {
 	company: {
-		name: "Tech Corp",
+		name: 'Tech Corp',
 		founded: 2010,
 		employees: 150,
 		departments: [
 			{
-				name: "Engineering",
+				name: 'Engineering',
 				headCount: 80,
 				teams: [
 					{
-						name: "Frontend",
+						name: 'Frontend',
 						members: 25,
-						technologies: ["React", "Vue", "Svelte"]
+						technologies: ['React', 'Vue', 'Svelte']
 					},
 					{
-						name: "Backend",
+						name: 'Backend',
 						members: 30,
-						technologies: ["Node.js", "Python", "Go"]
+						technologies: ['Node.js', 'Python', 'Go']
 					}
 				]
 			},
 			{
-				name: "Marketing",
+				name: 'Marketing',
 				headCount: 30,
 				campaigns: [
 					{
-						name: "Summer Sale",
+						name: 'Summer Sale',
 						budget: 50000,
-						channels: ["Social Media", "Email", "PPC"]
+						channels: ['Social Media', 'Email', 'PPC']
 					}
 				]
 			}
@@ -114,10 +114,10 @@ const complexData = {
 			expenses: 12000000,
 			profit: 3000000,
 			quarters: [
-				{ q: "Q1", revenue: 3500000 },
-				{ q: "Q2", revenue: 3800000 },
-				{ q: "Q3", revenue: 3700000 },
-				{ q: "Q4", revenue: 4000000 }
+				{ q: 'Q1', revenue: 3500000 },
+				{ q: 'Q2', revenue: 3800000 },
+				{ q: 'Q3', revenue: 3700000 },
+				{ q: 'Q4', revenue: 4000000 }
 			]
 		}
 	}
@@ -125,10 +125,10 @@ const complexData = {
 
 // Array of objects for testing
 const arrayData = [
-	{ id: 1, type: "info", message: "System initialized", timestamp: Date.now() },
-	{ id: 2, type: "warning", message: "High memory usage", timestamp: Date.now() - 1000 },
-	{ id: 3, type: "error", message: "Connection timeout", timestamp: Date.now() - 2000 },
-	{ id: 4, type: "info", message: "Backup completed", timestamp: Date.now() - 3000 }
+	{ id: 1, type: 'info', message: 'System initialized', timestamp: Date.now() },
+	{ id: 2, type: 'warning', message: 'High memory usage', timestamp: Date.now() - 1000 },
+	{ id: 3, type: 'error', message: 'Connection timeout', timestamp: Date.now() - 2000 },
+	{ id: 4, type: 'info', message: 'Backup completed', timestamp: Date.now() - 3000 }
 ];
 
 // Store for POST/PUT/PATCH testing
@@ -176,11 +176,11 @@ app.get('/api/search', (req, res) => {
 app.get('/api/users/:id', (req, res) => {
 	const userId = parseInt(req.params.id);
 	console.log(`[GET /api/users/${userId}] Request received`);
-	const user = dynamicData.users.find(u => u.id === userId);
+	const user = dynamicData.users.find((u) => u.id === userId);
 	if (user) {
 		res.json(user);
 	} else {
-		res.status(404).json({ error: "User not found", userId });
+		res.status(404).json({ error: 'User not found', userId });
 	}
 });
 
@@ -194,7 +194,7 @@ app.post('/api/users', (req, res) => {
 	};
 	dynamicData.users.push(newUser);
 	res.status(201).json({
-		message: "User created successfully",
+		message: 'User created successfully',
 		user: newUser,
 		totalUsers: dynamicData.users.length
 	});
@@ -214,8 +214,8 @@ app.post('/api/echo', (req, res) => {
 app.put('/api/users/:id', (req, res) => {
 	const userId = parseInt(req.params.id);
 	console.log(`[PUT /api/users/${userId}] Body:`, req.body);
-	const userIndex = dynamicData.users.findIndex(u => u.id === userId);
-	
+	const userIndex = dynamicData.users.findIndex((u) => u.id === userId);
+
 	if (userIndex !== -1) {
 		dynamicData.users[userIndex] = {
 			...dynamicData.users[userIndex],
@@ -224,11 +224,11 @@ app.put('/api/users/:id', (req, res) => {
 			updatedAt: new Date().toISOString()
 		};
 		res.json({
-			message: "User updated successfully",
+			message: 'User updated successfully',
 			user: dynamicData.users[userIndex]
 		});
 	} else {
-		res.status(404).json({ error: "User not found", userId });
+		res.status(404).json({ error: 'User not found', userId });
 	}
 });
 
@@ -236,22 +236,22 @@ app.put('/api/users/:id', (req, res) => {
 app.patch('/api/users/:id', (req, res) => {
 	const userId = parseInt(req.params.id);
 	console.log(`[PATCH /api/users/${userId}] Body:`, req.body);
-	const userIndex = dynamicData.users.findIndex(u => u.id === userId);
-	
+	const userIndex = dynamicData.users.findIndex((u) => u.id === userId);
+
 	if (userIndex !== -1) {
 		// PATCH only updates provided fields
-		Object.keys(req.body).forEach(key => {
+		Object.keys(req.body).forEach((key) => {
 			dynamicData.users[userIndex][key] = req.body[key];
 		});
 		dynamicData.users[userIndex].patchedAt = new Date().toISOString();
-		
+
 		res.json({
-			message: "User patched successfully",
+			message: 'User patched successfully',
 			user: dynamicData.users[userIndex],
 			patchedFields: Object.keys(req.body)
 		});
 	} else {
-		res.status(404).json({ error: "User not found", userId });
+		res.status(404).json({ error: 'User not found', userId });
 	}
 });
 
@@ -259,17 +259,17 @@ app.patch('/api/users/:id', (req, res) => {
 app.delete('/api/users/:id', (req, res) => {
 	const userId = parseInt(req.params.id);
 	console.log(`[DELETE /api/users/${userId}] Request received`);
-	const userIndex = dynamicData.users.findIndex(u => u.id === userId);
-	
+	const userIndex = dynamicData.users.findIndex((u) => u.id === userId);
+
 	if (userIndex !== -1) {
 		const deletedUser = dynamicData.users.splice(userIndex, 1)[0];
 		res.json({
-			message: "User deleted successfully",
+			message: 'User deleted successfully',
 			deletedUser,
 			remainingUsers: dynamicData.users.length
 		});
 	} else {
-		res.status(404).json({ error: "User not found", userId });
+		res.status(404).json({ error: 'User not found', userId });
 	}
 });
 
@@ -287,11 +287,11 @@ app.all('/api/headers', (req, res) => {
 
 // Error simulation endpoints
 app.get('/api/error/400', (req, res) => {
-	res.status(400).json({ error: "Bad Request", message: "Invalid parameters" });
+	res.status(400).json({ error: 'Bad Request', message: 'Invalid parameters' });
 });
 
 app.get('/api/error/500', (req, res) => {
-	res.status(500).json({ error: "Internal Server Error", message: "Something went wrong" });
+	res.status(500).json({ error: 'Internal Server Error', message: 'Something went wrong' });
 });
 
 // Slow response simulation
@@ -334,7 +334,7 @@ app.post('/api/reset', (req, res) => {
 	console.log('[POST /api/reset] Resetting dynamic data');
 	dynamicData = { ...sampleData };
 	res.json({
-		message: "Data reset successfully",
+		message: 'Data reset successfully',
 		timestamp: new Date().toISOString()
 	});
 });
@@ -342,26 +342,26 @@ app.post('/api/reset', (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
 	res.json({
-		message: "PDJSONEditor Test Server",
-		version: "1.0.0",
+		message: 'PDJSONEditor Test Server',
+		version: '1.0.0',
 		endpoints: [
-			"GET /api/users - Get all users",
-			"GET /api/users/:id - Get specific user",
-			"POST /api/users - Create new user",
-			"PUT /api/users/:id - Update user",
-			"PATCH /api/users/:id - Patch user",
-			"DELETE /api/users/:id - Delete user",
-			"GET /api/products - Get products data",
-			"GET /api/complex - Get complex nested data",
-			"GET /api/array - Get array data",
-			"GET /api/search?q=query&limit=10 - Search with query params",
-			"POST /api/echo - Echo back the request",
-			"ALL /api/headers - Test headers",
-			"GET /api/error/400 - Simulate 400 error",
-			"GET /api/error/500 - Simulate 500 error",
-			"GET /api/slow?delay=3000 - Slow response",
-			"GET /api/large?size=100 - Large dataset",
-			"POST /api/reset - Reset dynamic data"
+			'GET /api/users - Get all users',
+			'GET /api/users/:id - Get specific user',
+			'POST /api/users - Create new user',
+			'PUT /api/users/:id - Update user',
+			'PATCH /api/users/:id - Patch user',
+			'DELETE /api/users/:id - Delete user',
+			'GET /api/products - Get products data',
+			'GET /api/complex - Get complex nested data',
+			'GET /api/array - Get array data',
+			'GET /api/search?q=query&limit=10 - Search with query params',
+			'POST /api/echo - Echo back the request',
+			'ALL /api/headers - Test headers',
+			'GET /api/error/400 - Simulate 400 error',
+			'GET /api/error/500 - Simulate 500 error',
+			'GET /api/slow?delay=3000 - Slow response',
+			'GET /api/large?size=100 - Large dataset',
+			'POST /api/reset - Reset dynamic data'
 		]
 	});
 });

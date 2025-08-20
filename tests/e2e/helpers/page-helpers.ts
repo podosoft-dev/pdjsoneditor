@@ -20,7 +20,7 @@ export class PDJSONEditorPage {
 		// CodeMirror uses contenteditable, so we need to get the text content
 		// First wait for content to be rendered
 		await this.page.waitForTimeout(100);
-		
+
 		// Try multiple methods to get the content
 		// Method 1: Get all text from cm-content (most reliable for large content)
 		const cmContent = await this.page.locator('.cm-content').textContent();
@@ -28,38 +28,38 @@ export class PDJSONEditorPage {
 			// Clean up the content - remove any extra whitespace
 			return cmContent.trim();
 		}
-		
+
 		// Method 2: Get all cm-line elements and concatenate their text
 		const lines = await this.page.locator('.cm-line').allTextContents();
-		
+
 		// If no lines found or empty, return empty string
 		if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
 			return '';
 		}
-		
+
 		// Join lines and clean up any trailing whitespace or empty lines
 		let content = lines.join('\n');
-		
+
 		// Remove trailing whitespace and empty lines
 		content = content.replace(/\s+$/g, '');
-		
+
 		return content;
 	}
 
 	async setEditorContent(json: string) {
 		// Click in the editor to focus it
 		await this.page.locator('.cm-content').click();
-		
+
 		// Select all text using keyboard shortcut
 		await this.page.keyboard.press('Meta+A');
-		
+
 		// Wait a bit for selection to complete
 		await this.page.waitForTimeout(50);
-		
+
 		// Use insertText to replace the selected text
 		// This is more reliable than Delete + type
 		await this.page.keyboard.insertText(json);
-		
+
 		// Wait for CodeMirror to update
 		await this.page.waitForTimeout(200);
 	}
@@ -78,7 +78,10 @@ export class PDJSONEditorPage {
 	async selectHTTPMethod(method: string) {
 		// Click on the method dropdown button (it shows current method)
 		// The button contains the method text but may have additional elements
-		const dropdownButton = this.page.locator('button').filter({ hasText: /GET|POST|PUT|PATCH|DELETE/ }).first();
+		const dropdownButton = this.page
+			.locator('button')
+			.filter({ hasText: /GET|POST|PUT|PATCH|DELETE/ })
+			.first();
 		await dropdownButton.click();
 		// Select the desired method from dropdown
 		await this.page.locator(`[role="menuitem"]:has-text("${method}")`).click();
@@ -109,16 +112,19 @@ export class PDJSONEditorPage {
 		// First try by title attribute (works for English)
 		let settingsButton = this.page.locator('button[title*="Request"]').first();
 		const count = await settingsButton.count();
-		
+
 		if (count === 0) {
 			// If not found by title, find the small button with icon after URL input
 			// It's the button right before the "Go" button
-			const goButton = this.page.getByRole('button', { name: 'Go' });
-			settingsButton = this.page.locator('button.h-7.px-2').filter({
-				has: this.page.locator('svg')
-			}).first();
+			// const goButton = this.page.getByRole('button', { name: 'Go' });
+			settingsButton = this.page
+				.locator('button.h-7.px-2')
+				.filter({
+					has: this.page.locator('svg')
+				})
+				.first();
 		}
-		
+
 		await settingsButton.click();
 		// Wait for dialog to open
 		await this.page.waitForSelector('[role="dialog"]', { timeout: 5000 });
@@ -128,19 +134,19 @@ export class PDJSONEditorPage {
 		if (openDialog) {
 			await this.openRequestSettings();
 		}
-		
+
 		// Wait for dialog inputs to be ready
 		await this.page.waitForTimeout(200);
-		
+
 		// Find the last header row and fill it
 		const keyInputs = this.page.locator('[role="dialog"] input[placeholder="Key"]');
 		const valueInputs = this.page.locator('[role="dialog"] input[placeholder="Value"]');
-		
+
 		const keyCount = await keyInputs.count();
 		if (keyCount > 0) {
 			await keyInputs.nth(keyCount - 1).fill(key);
 			await valueInputs.nth(keyCount - 1).fill(value);
-			
+
 			// Add another row for next header
 			const addButton = this.page.locator('[role="dialog"] button:has-text("Add Header")').first();
 			if (await addButton.isVisible()) {
@@ -154,10 +160,10 @@ export class PDJSONEditorPage {
 		if (openDialog) {
 			await this.openRequestSettings();
 		}
-		
+
 		// Wait for dialog to be ready
 		await this.page.waitForTimeout(200);
-		
+
 		// Fill in the custom body directly in the textarea
 		const textarea = this.page.locator('[role="dialog"] textarea').first();
 		await textarea.fill(body);
@@ -195,15 +201,15 @@ export class PDJSONEditorPage {
 	}
 
 	// Validation helpers
-	async validateJSONInEditor(expectedJson: any) {
+	async validateJSONInEditor(expectedJson: unknown) {
 		const content = await this.getEditorContent();
 		let actualJson;
 		try {
 			actualJson = JSON.parse(content);
-		} catch (e) {
+		} catch {
 			throw new Error(`Invalid JSON in editor: ${content}`);
 		}
-		
+
 		expect(actualJson).toEqual(expectedJson);
 	}
 
@@ -220,9 +226,9 @@ export class PDJSONEditorPage {
 
 	// Utility functions
 	async takeScreenshot(name: string) {
-		await this.page.screenshot({ 
+		await this.page.screenshot({
 			path: `test-results/screenshots/${name}.png`,
-			fullPage: true 
+			fullPage: true
 		});
 	}
 

@@ -1,6 +1,6 @@
 # PDJsonEditor
 
-*[English](README.md)*
+_[English](README.md)_
 
 SvelteKit과 Svelte 5로 구축된 강력한 JSON 시각화 및 편집 도구입니다. JSON 데이터를 코드 에디터와 인터랙티브 그래프 뷰에서 동시에 보고 편집할 수 있습니다.
 
@@ -11,18 +11,21 @@ SvelteKit과 Svelte 5로 구축된 강력한 JSON 시각화 및 편집 도구입
 ## ✨ 주요 기능
 
 ### 📝 고급 JSON 에디터
+
 - **문법 강조**: CodeMirror 기반 JSON 문법 강조 기능
 - **실시간 검증**: 즉시 JSON 문법 검증 및 오류 리포팅
 - **포맷 & 압축**: 원클릭 JSON 포맷팅 및 압축 기능
 - **네비게이션**: 그래프 노드 클릭으로 해당 JSON 위치로 이동
 
 ### 🔗 HTTP 요청 통합
+
 - **다중 메소드 지원**: GET, POST, PUT, DELETE, PATCH 요청
 - **커스텀 헤더**: HTTP 헤더 추가 및 관리
 - **요청 본문**: POST/PUT/PATCH용 커스텀 요청 본문 설정
 - **URL 가져오기**: URL에서 직접 JSON 데이터 가져오기
 
 ### 📊 인터랙티브 그래프 시각화
+
 - **트리 구조**: JSON을 인터랙티브 트리 그래프로 시각화
 - **컴팩트 노드**: 원시 값 그룹화 디스플레이
 - **확장/축소**: 시각적 표시와 함께 노드 확장 토글
@@ -30,12 +33,14 @@ SvelteKit과 Svelte 5로 구축된 강력한 JSON 시각화 및 편집 도구입
 - **자동 레이아웃**: Dagre 기반 자동 그래프 레이아웃
 
 ### 🎯 스마트 노드 디스플레이
+
 - **그룹화된 원시 값**: 명확성을 위해 부모 노드에서 원시 값 그룹화
 - **참조 타입**: 객체와 배열을 참조로 표시 (예: `address {3}`, `hobbies [3]`)
 - **더 보기**: 20개 이상의 항목을 가진 노드를 "더 보기" 기능과 함께 자동 축소
 - **개별 토글**: 개별 참조 항목 확장/축소
 
 ### 🌐 다국어 지원
+
 - **다중 언어**: 영어 및 한국어 지원
 - **언어 전환기**: 헤더에서 쉬운 언어 전환
 - **지속적 설정**: localStorage에 언어 설정 저장
@@ -43,28 +48,33 @@ SvelteKit과 Svelte 5로 구축된 강력한 JSON 시각화 및 편집 도구입
 ## 🚀 시작하기
 
 ### 필수 조건
+
 - Node.js v20.19 이상
 - npm 또는 yarn 패키지 매니저
 
 ### 설치
 
 1. **저장소 클론**
+
 ```bash
 git clone https://github.com/podosoft-dev/pdjsoneditor.git
 cd pdjsoneditor
 ```
 
 2. **의존성 설치**
+
 ```bash
 npm install
 ```
 
 3. **개발 서버 시작**
+
 ```bash
 npm run dev
 ```
 
 4. **브라우저에서 열기**
+
 ```
 http://localhost:5173
 ```
@@ -141,11 +151,12 @@ services:
     image: ghcr.io/podosoft-dev/pdjsoneditor:latest
     container_name: pdjsoneditor
     ports:
-      - "3000:3000"
+      - '3000:3000'
     restart: unless-stopped
 ```
 
 그 다음 실행:
+
 ```bash
 docker-compose up -d
 ```
@@ -155,17 +166,20 @@ docker-compose up -d
 ## 📖 사용 방법
 
 ### 기본 JSON 편집
+
 1. **JSON 붙여넣기 또는 입력**: 왼쪽 에디터 패널에서
 2. **구조 보기**: 오른쪽 그래프 패널에서
 3. **뷰 간 네비게이션**: 노드 클릭 또는 에디터 사용
 
 ### URL에서 데이터 가져오기
+
 1. **HTTP 메소드 선택**: 드롭다운에서 (GET, POST, PUT, DELETE, PATCH)
 2. **URL 입력**: 입력 필드에
 3. **헤더와 본문 설정**: Settings 버튼 사용 (선택사항)
 4. **"Go" 클릭**: JSON 데이터를 가져와서 로드
 
 ### 그래프 상호작용
+
 - **확장/축소**: 노드의 색깔있는 핸들 클릭
 - **더 보기**: 많은 항목이 있는 노드에서 "더 보기" 클릭
 - **네비게이션**: 노드 클릭으로 해당 JSON 위치로 이동

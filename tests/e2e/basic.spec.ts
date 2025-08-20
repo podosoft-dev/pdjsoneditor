@@ -12,10 +12,10 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 	test('should load the editor with default JSON', async ({ page }) => {
 		// Check that the editor is visible
 		await expect(page.locator('.cm-editor')).toBeVisible();
-		
+
 		// Check that the graph view is visible
 		await expect(page.locator('.svelte-flow')).toBeVisible();
-		
+
 		// Verify initial JSON is present
 		const content = await editorPage.getEditorContent();
 		expect(content).toContain('donut');
@@ -23,14 +23,14 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 		expect(content).toContain('batters');
 	});
 
-	test('should format JSON when Format button is clicked', async ({ page }) => {
+	test('should format JSON when Format button is clicked', async () => {
 		// Set minified JSON
 		const minifiedJson = '{"name":"Test","age":25,"active":true}';
 		await editorPage.setEditorContent(minifiedJson);
-		
+
 		// Click format button
 		await editorPage.formatJSON();
-		
+
 		// Check that JSON is formatted (should have line breaks)
 		const formatted = await editorPage.getEditorContent();
 		expect(formatted.split('\n').length).toBeGreaterThan(1);
@@ -38,7 +38,7 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 		expect(() => JSON.parse(formatted)).not.toThrow();
 	});
 
-	test('should minify JSON when Minify button is clicked', async ({ page }) => {
+	test('should minify JSON when Minify button is clicked', async () => {
 		// Start with formatted JSON
 		const formattedJson = `{
 			"name": "Test",
@@ -46,10 +46,10 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 			"active": true
 		}`;
 		await editorPage.setEditorContent(formattedJson);
-		
+
 		// Click minify button
 		await editorPage.minifyJSON();
-		
+
 		// Check that JSON is minified (should have fewer lines)
 		const minified = await editorPage.getEditorContent();
 		// Minified JSON should have significantly fewer lines than formatted
@@ -62,18 +62,18 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 	test('should update graph when JSON is modified', async ({ page }) => {
 		// Wait for initial graph to render
 		await page.waitForSelector('.svelte-flow__node', { timeout: 5000 });
-		
+
 		// Get initial node count
 		const initialNodeCount = await editorPage.getNodeCount();
 		expect(initialNodeCount).toBeGreaterThan(0);
-		
+
 		// Update JSON with more complex structure
 		const newJson = `{"users":[{"id":1,"name":"User 1"},{"id":2,"name":"User 2"}],"settings":{"theme":"dark","language":"en"}}`;
 		await editorPage.setEditorContent(newJson);
-		
+
 		// Wait for graph to update
 		await page.waitForTimeout(2000);
-		
+
 		// Check that node count has changed
 		const newNodeCount = await editorPage.getNodeCount();
 		expect(newNodeCount).toBeGreaterThan(0);
@@ -84,10 +84,10 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 		// Enter invalid JSON
 		const invalidJson = '{ "name": "Test", "age": }';
 		await editorPage.setEditorContent(invalidJson);
-		
+
 		// Wait for error to appear
 		await page.waitForTimeout(500);
-		
+
 		// Check for error message
 		const errorElement = page.locator('text=/Invalid JSON|Unexpected token/i');
 		await expect(errorElement).toBeVisible();
@@ -97,10 +97,10 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 		// Check that both panels are visible
 		const editorPanel = page.locator('.cm-editor');
 		const graphPanel = page.locator('.svelte-flow');
-		
+
 		await expect(editorPanel).toBeVisible();
 		await expect(graphPanel).toBeVisible();
-		
+
 		// Test resizable functionality (if implemented)
 		const resizeHandle = page.locator('[data-panel-resize-handle]');
 		if (await resizeHandle.isVisible()) {
@@ -123,48 +123,48 @@ test.describe('PDJSONEditor Basic Functionality', () => {
 				}
 			}
 		}));
-		
+
 		const largeJson = JSON.stringify({ data: largeArray }, null, 2);
 		await editorPage.setEditorContent(largeJson);
-		
+
 		// Wait for graph to render
 		await page.waitForTimeout(2000);
-		
+
 		// Verify graph has rendered nodes
 		const nodeCount = await editorPage.getNodeCount();
 		expect(nodeCount).toBeGreaterThan(0);
-		
+
 		// Verify no errors
 		await editorPage.waitForNoErrors();
 	});
 
 	test('should preserve JSON structure after format/minify cycle', async ({ page }) => {
 		const originalJson = {
-			name: "Test User",
+			name: 'Test User',
 			age: 30,
 			active: true,
-			tags: ["developer", "tester"],
+			tags: ['developer', 'tester'],
 			address: {
-				city: "San Francisco",
-				country: "USA"
+				city: 'San Francisco',
+				country: 'USA'
 			}
 		};
-		
+
 		// Set original JSON
 		await editorPage.setEditorContent(JSON.stringify(originalJson));
-		
+
 		// Format
 		await editorPage.formatJSON();
 		await page.waitForTimeout(500);
-		
+
 		// Minify
 		await editorPage.minifyJSON();
 		await page.waitForTimeout(500);
-		
+
 		// Parse and compare
 		const finalContent = await editorPage.getEditorContent();
 		const finalJson = JSON.parse(finalContent);
-		
+
 		expect(finalJson).toEqual(originalJson);
 	});
 });
