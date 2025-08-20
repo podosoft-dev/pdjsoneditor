@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import JsonEditor from '$lib/components/JsonEditor.svelte';
 	import JsonGraph from '$lib/components/JsonGraph.svelte';
-    import { Button } from '$lib/components/ui/button';
+	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -98,12 +98,12 @@
 	let editorRef: JsonEditor;
 	let parseTimeout: ReturnType<typeof setTimeout>;
 
-    // LocalStorage keys are centralized in $lib/constants
+	// LocalStorage keys are centralized in $lib/constants
 
 	// Initialize with empty values (will be populated from localStorage in onMount)
 	let urlInput = $state<string>('https://jsonplaceholder.typicode.com/todos/1');
 	let isLoading = $state<boolean>(false);
-    let httpMethod = $state<string>('GET');
+	let httpMethod = $state<string>('GET');
 	let isDialogOpen = $state<boolean>(false);
 	let customHeaders = $state<Array<{ key: string; value: string }>>([]);
 	let tempHeaders = $state<Array<{ key: string; value: string }>>([]);
@@ -116,10 +116,10 @@
 	let httpStatusCode = $state<number | null>(null);
 	let responseTime = $state<number | null>(null);
 
-    const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+	const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
 
-    // Track in-flight request for cancellation
-    let abortController: AbortController | null = null;
+	// Track in-flight request for cancellation
+	let abortController: AbortController | null = null;
 
 	function openSettingsDialog() {
 		// Copy current headers to temp, ensure it's a proper array
@@ -162,7 +162,7 @@
 	function clearAllSettings() {
 		if (confirm($LL.editor.clearAllConfirm())) {
 			// Clear all localStorage keys
-			Object.values(STORAGE_KEYS).forEach(key => {
+			Object.values(STORAGE_KEYS).forEach((key) => {
 				localStorage.removeItem(key);
 			});
 
@@ -255,70 +255,70 @@
 		}
 	}
 
-    async function fetchJsonFromUrl() {
-        if (!urlInput.trim()) {
-            error = $LL.editor.urlRequired();
-            return;
-        }
+	async function fetchJsonFromUrl() {
+		if (!urlInput.trim()) {
+			error = $LL.editor.urlRequired();
+			return;
+		}
 
-        isLoading = true;
-        // Only clear error if it's a fetch-related error
-        if (error && (error.includes('fetch') || error.includes('HTTP'))) {
-            error = '';
-        }
-        httpStatusCode = null;
-        responseTime = null;
+		isLoading = true;
+		// Only clear error if it's a fetch-related error
+		if (error && (error.includes('fetch') || error.includes('HTTP'))) {
+			error = '';
+		}
+		httpStatusCode = null;
+		responseTime = null;
 
-        try {
-            // Cancel previous request if any
-            if (abortController) {
-                abortController.abort();
-            }
-            abortController = new AbortController();
+		try {
+			// Cancel previous request if any
+			if (abortController) {
+				abortController.abort();
+			}
+			abortController = new AbortController();
 
-            const startTime = performance.now();
-            const res = await requestJson({
-                method: httpMethod as HttpMethod,
-                url: urlInput,
-                headers: customHeaders,
-                editorJson: jsonValue,
-                customBody,
-                sendAsRawText,
-                useEditorContent,
-                signal: abortController.signal
-            });
-            const endTime = performance.now();
-            responseTime = Math.round(endTime - startTime);
-            httpStatusCode = res.status;
+			const startTime = performance.now();
+			const res = await requestJson({
+				method: httpMethod as HttpMethod,
+				url: urlInput,
+				headers: customHeaders,
+				editorJson: jsonValue,
+				customBody,
+				sendAsRawText,
+				useEditorContent,
+				signal: abortController.signal
+			});
+			const endTime = performance.now();
+			responseTime = Math.round(endTime - startTime);
+			httpStatusCode = res.status;
 
-            if (res.data !== undefined) {
-                jsonValue = JSON.stringify(res.data, null, 2);
-            } else if (res.rawText !== undefined) {
-                // Non-JSON 응답은 텍스트로 보여줌
-                jsonValue = JSON.stringify({ response: res.rawText }, null, 2);
-            }
+			if (res.data !== undefined) {
+				jsonValue = JSON.stringify(res.data, null, 2);
+			} else if (res.rawText !== undefined) {
+				// Non-JSON 응답은 텍스트로 보여줌
+				jsonValue = JSON.stringify({ response: res.rawText }, null, 2);
+			}
 
-            if (res.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
-                error = '';
-            }
-        } catch (e) {
-            if ((e as any)?.name === 'AbortError') {
-                // silently ignore aborted request
-                return;
-            }
-            if (e instanceof Error) {
-                if (e.message.includes('Failed to fetch')) {
-                    error = $LL.editor.fetchError();
-                } else {
-                    error = e.message;
-                }
-            } else {
-                error = $LL.editor.fetchError();
-            }
-        } finally {
-            isLoading = false;
-        }
-    }
+			if (res.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
+				error = '';
+			}
+		} catch (e) {
+			if ((e as any)?.name === 'AbortError') {
+				// silently ignore aborted request
+				return;
+			}
+			if (e instanceof Error) {
+				if (e.message.includes('Failed to fetch')) {
+					error = $LL.editor.fetchError();
+				} else {
+					error = e.message;
+				}
+			} else {
+				error = $LL.editor.fetchError();
+			}
+		} finally {
+			isLoading = false;
+		}
+	}
 
 	function handleUrlKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') {
@@ -625,7 +625,7 @@
 			<div>
 				<h4 class="text-sm font-medium mb-2">{$LL.editor.headers()}</h4>
 				<div class="space-y-2">
-					<div class={tempHeaders.length >= 4 ? "max-h-48 overflow-y-auto space-y-2" : "space-y-2"}>
+					<div class={tempHeaders.length >= 4 ? 'max-h-48 overflow-y-auto space-y-2' : 'space-y-2'}>
 						{#each tempHeaders as header, index}
 							<div class="flex gap-2">
 								<Input

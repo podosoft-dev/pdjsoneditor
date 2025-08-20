@@ -1,0 +1,31 @@
+# Build output
+build/
+dist/
+.svelte-kit/
+node_modules/
+
+# Test reports
+playwright-report/
+test-results/
+coverage/
+
+# Config and generated files
+*.config.js
+*.config.ts
+.DS_Store
+*.min.js
+
+# Temporary files
+*.tmp
+*.log
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Documentation
+CLAUDE.md
+*.md

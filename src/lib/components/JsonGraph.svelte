@@ -19,10 +19,9 @@
 	import { logger } from '$lib/logger';
 	import { graphLoading } from '$lib/stores/graphLoading';
 	// Use Vite worker plugin to ensure bundling works in all environments
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-ignore - Vite injects a Worker constructor type via ?worker
+	// @ts-expect-error - Vite injects a Worker constructor type via ?worker
 	import GraphLayoutWorker from '$lib/workers/graphLayout.worker.ts?worker&module';
-	import type { JsonValue, JsonObject, NodeItem, JsonStructure } from '$lib/types/json';
+	import type { JsonValue, NodeItem } from '$lib/types/json';
 
 	interface Props {
 		jsonData: JsonValue;
@@ -94,86 +93,6 @@
 		return null;
 	}
 
-	// Helper function to extract JSON structure (keys only, not values)
-	function getJsonStructure(obj: JsonValue | null | undefined): JsonStructure | string | null {
-		if (obj === null || obj === undefined) return null;
-		if (typeof obj !== 'object') return typeof obj;
-
-		if (Array.isArray(obj)) {
-			// For arrays, track length and structure of first element
-			return {
-				_type: 'array',
-				_length: obj.length,
-				_sample: obj.length > 0 ? getJsonStructure(obj[0]) : null
-			};
-		}
-
-		// For objects, track keys and their structures
-		const structure: JsonStructure = { _type: 'object' };
-		for (const key in obj) {
-			structure[key] = getJsonStructure((obj as JsonObject)[key]);
-		}
-		return structure;
-	}
-
-	// Compare two JSON structures to detect structural changes
-	function hasStructuralChange(
-		oldStruct: JsonStructure | string | null,
-		newStruct: JsonStructure | string | null
-	): boolean {
-		if (oldStruct === newStruct) return false;
-		if (oldStruct === null || newStruct === null) return true;
-		if (typeof oldStruct !== typeof newStruct) return true;
-
-		if (typeof oldStruct === 'string') {
-			return oldStruct !== newStruct; // Type change
-		}
-
-		if (
-			typeof oldStruct === 'object' &&
-			typeof newStruct === 'object' &&
-			oldStruct._type === 'array' &&
-			newStruct._type === 'array'
-		) {
-			// Consider it structural if array length changes significantly (more than 20% or by more than 10 items)
-			const oldLength = oldStruct._length ?? 0;
-			const newLength = newStruct._length ?? 0;
-			const lengthDiff = Math.abs(oldLength - newLength);
-			const percentChange = lengthDiff / Math.max(oldLength, 1);
-			if (lengthDiff > 10 || percentChange > 0.2) return true;
-
-			// Check sample structure
-			return hasStructuralChange(oldStruct._sample ?? null, newStruct._sample ?? null);
-		}
-
-		if (
-			typeof oldStruct === 'object' &&
-			typeof newStruct === 'object' &&
-			oldStruct._type === 'object' &&
-			newStruct._type === 'object'
-		) {
-			// Check if keys are different
-			const oldKeys = Object.keys(oldStruct).filter((k) => k !== '_type');
-			const newKeys = Object.keys(newStruct).filter((k) => k !== '_type');
-
-			if (oldKeys.length !== newKeys.length) return true;
-
-			for (const key of oldKeys) {
-				if (!newKeys.includes(key)) return true;
-				const oldValue = oldStruct[key] ?? null;
-				const newValue = newStruct[key] ?? null;
-				if (
-					hasStructuralChange(
-						oldValue as JsonStructure | string | null,
-						newValue as JsonStructure | string | null
-					)
-				)
-					return true;
-			}
-		}
-
-		return false;
-	}
 	const measuredHeights = new Map<string, number>(); // Store actual measured heights
 	// --- dynamic reflow when heights change ---
 	let reflowScheduled = false;
@@ -322,11 +241,6 @@
 				config: cfg
 			});
 		});
-	}
-
-	// Initial node height (used until actual measurements arrive)
-	function getInitialNodeHeight(): number {
-		return LAYOUT_CONFIG.INITIAL_HEIGHT;
 	}
 
 	function estimateDisplayItemCount(node: Node): number {

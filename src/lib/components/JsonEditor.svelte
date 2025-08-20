@@ -19,31 +19,31 @@
 	function buildPathToPositionMap(state: EditorState): Map<string, { start: number; end: number }> {
 		const pathMap = new Map<string, { start: number; end: number }>();
 		const tree = syntaxTree(state);
-		
+
 		// Helper to get text content of a node
 		function getNodeText(from: number, to: number): string {
 			return state.doc.sliceString(from, to);
 		}
-		
+
 		// Recursive function to traverse with path context
 		function traverse(cursor: any, path: string[] = []) {
 			do {
 				const nodeName = cursor.name;
-				
+
 				if (nodeName === 'Property') {
 					// Handle object properties
 					let propertyKey = '';
 					let valueStart = -1;
 					let valueEnd = -1;
 					let valueType = '';
-					
+
 					if (cursor.firstChild()) {
 						// Get property name
 						if (cursor.name === 'PropertyName') {
 							const keyText = getNodeText(cursor.from, cursor.to);
 							propertyKey = keyText.replace(/^"|"$/g, '');
 						}
-						
+
 						// Skip to value (past the colon)
 						while (cursor.nextSibling()) {
 							if (cursor.name !== ':') {
@@ -53,16 +53,16 @@
 								break;
 							}
 						}
-						
+
 						// Store the path and position
 						if (propertyKey && valueStart !== -1) {
 							const valuePath = [...path, propertyKey];
 							const pathStr = valuePath.join('.');
-							
+
 							if (pathStr) {
 								pathMap.set(pathStr, { start: valueStart, end: valueEnd });
 							}
-							
+
 							// If value is an array, handle array elements specially
 							if (valueType === 'Array') {
 								if (cursor.firstChild()) {
@@ -72,42 +72,47 @@
 										if (cursor.name === 'Object') {
 											const elementPath = [...valuePath, index.toString()];
 											const elementPathStr = elementPath.join('.');
-											
+
 											if (elementPathStr) {
 												pathMap.set(elementPathStr, { start: cursor.from, end: cursor.to });
 											}
-											
+
 											// Traverse into the object
 											if (cursor.firstChild()) {
 												traverse(cursor, elementPath);
 												cursor.parent();
 											}
-											
+
 											index++;
 										} else if (cursor.name === 'Array') {
 											const elementPath = [...valuePath, index.toString()];
 											const elementPathStr = elementPath.join('.');
-											
+
 											if (elementPathStr) {
 												pathMap.set(elementPathStr, { start: cursor.from, end: cursor.to });
 											}
-											
+
 											// Recursive array
 											if (cursor.firstChild()) {
 												traverse(cursor, elementPath);
 												cursor.parent();
 											}
-											
+
 											index++;
-										} else if (cursor.name !== '[' && cursor.name !== ']' && cursor.name !== ',' && cursor.name !== '⚠') {
+										} else if (
+											cursor.name !== '[' &&
+											cursor.name !== ']' &&
+											cursor.name !== ',' &&
+											cursor.name !== '⚠'
+										) {
 											// Primitive values in array
 											const elementPath = [...valuePath, index.toString()];
 											const elementPathStr = elementPath.join('.');
-											
+
 											if (elementPathStr) {
 												pathMap.set(elementPathStr, { start: cursor.from, end: cursor.to });
 											}
-											
+
 											index++;
 										}
 									} while (cursor.nextSibling());
@@ -121,7 +126,7 @@
 								}
 							}
 						}
-						
+
 						cursor.parent();
 					}
 				} else if (nodeName === 'Array') {
@@ -134,44 +139,49 @@
 								// For object elements, store the indexed path and traverse
 								const elementPath = [...path, index.toString()];
 								const pathStr = elementPath.join('.');
-								
+
 								// Store the position of this array element
 								if (pathStr) {
 									pathMap.set(pathStr, { start: cursor.from, end: cursor.to });
 								}
-								
+
 								// Traverse into the object to get its properties
 								if (cursor.firstChild()) {
 									traverse(cursor, elementPath);
 									cursor.parent();
 								}
-								
+
 								index++;
 							} else if (cursor.name === 'Array') {
 								// For nested arrays
 								const elementPath = [...path, index.toString()];
 								const pathStr = elementPath.join('.');
-								
+
 								if (pathStr) {
 									pathMap.set(pathStr, { start: cursor.from, end: cursor.to });
 								}
-								
+
 								// Traverse into the nested array
 								if (cursor.firstChild()) {
 									traverse(cursor, elementPath);
 									cursor.parent();
 								}
-								
+
 								index++;
-							} else if (cursor.name !== '[' && cursor.name !== ']' && cursor.name !== ',' && cursor.name !== '⚠') {
+							} else if (
+								cursor.name !== '[' &&
+								cursor.name !== ']' &&
+								cursor.name !== ',' &&
+								cursor.name !== '⚠'
+							) {
 								// For primitive values
 								const elementPath = [...path, index.toString()];
 								const pathStr = elementPath.join('.');
-								
+
 								if (pathStr) {
 									pathMap.set(pathStr, { start: cursor.from, end: cursor.to });
 								}
-								
+
 								index++;
 							}
 						} while (cursor.nextSibling());
@@ -198,11 +208,11 @@
 				}
 			} while (cursor.nextSibling());
 		}
-		
+
 		// Start traversal
 		const cursor = tree.cursor();
 		traverse(cursor);
-		
+
 		return pathMap;
 	}
 
@@ -212,10 +222,10 @@
 		try {
 			// Build the path to position map using syntax tree
 			const pathMap = buildPathToPositionMap(view.state);
-			
+
 			// Look up the position for this path
 			const position = pathMap.get(path);
-			
+
 			if (position) {
 				// Navigate to the found position
 				view.dispatch({
@@ -223,7 +233,9 @@
 					scrollIntoView: true
 				});
 				view.focus();
-				logger.debug(`[JsonEditor] Navigated to path: ${path} at position ${position.start}-${position.end}`);
+				logger.debug(
+					`[JsonEditor] Navigated to path: ${path} at position ${position.start}-${position.end}`
+				);
 			} else {
 				logger.warn(`[JsonEditor] Path not found: ${path}`);
 			}

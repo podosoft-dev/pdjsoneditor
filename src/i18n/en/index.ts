@@ -30,9 +30,10 @@ const en: BaseTranslation = {
 		bodyDescription: 'Configure the request body for POST/PUT/PATCH requests.',
 		bodyPlaceholder: 'Enter request body (JSON, XML, etc.)',
 		useEditorContent: 'Use editor content as request body',
-		sendAsRawText: 'Send as raw text (don\'t parse as JSON)',
+		sendAsRawText: "Send as raw text (don't parse as JSON)",
 		clearAll: 'Clear All',
-		clearAllConfirm: 'Are you sure you want to clear all settings? This will remove all saved headers, body, and URL from storage.',
+		clearAllConfirm:
+			'Are you sure you want to clear all settings? This will remove all saved headers, body, and URL from storage.',
 		cancel: 'Cancel',
 		save: 'Save'
 	},
