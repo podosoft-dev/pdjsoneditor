@@ -6,8 +6,8 @@ import dagre from 'dagre';
 
 type NodeData = {
 	label: string;
-	items?: any[];
-	allItems?: any[];
+	items?: unknown[];
+	allItems?: unknown[];
 	isExpanded?: boolean;
 	isArray?: boolean;
 	nodeId?: string;
@@ -60,7 +60,7 @@ type LayoutRequest = {
 type ProgressMsg = { type: 'progress'; phase: 'build' | 'layout'; progress: number };
 type DoneMsg = { type: 'done'; nodes: FlowNode[] };
 
-const ctx: any = self;
+const ctx = self as unknown as Worker;
 
 function estimateDisplayItemCount(node: FlowNode, cfg: LayoutConfig, showAll: boolean): number {
 	if (!node.data?.isExpanded) return 0;

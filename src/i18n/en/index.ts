@@ -35,7 +35,10 @@ const en: BaseTranslation = {
 		clearAllConfirm:
 			'Are you sure you want to clear all settings? This will remove all saved headers, body, and URL from storage.',
 		cancel: 'Cancel',
-		save: 'Save'
+		save: 'Save',
+		regenerate: 'Regenerate',
+		regenerateTooltip: 'Regenerate values while preserving JSON structure',
+		regenerateSuccess: 'JSON values regenerated successfully'
 	},
 	graph: {
 		showMore: 'Show {count} more',
@@ -51,6 +54,15 @@ const en: BaseTranslation = {
 	},
 	footer: {
 		ready: 'Ready'
+	},
+	tabs: {
+		rename: 'Rename',
+		duplicate: 'Duplicate',
+		exportJson: 'Export JSON',
+		closeTab: 'Close Tab',
+		importJsonFile: 'Import JSON File',
+		newTab: 'New Tab',
+		import: 'Import'
 	}
 } satisfies BaseTranslation;
 

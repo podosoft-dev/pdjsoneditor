@@ -39,6 +39,19 @@ A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5
 - **Show More**: Automatically collapse nodes with 20+ items with "show more" functionality
 - **Individual Toggles**: Expand/collapse individual reference items
 
+### 📑 Multi-Tab Support
+
+- **Multiple Documents**: Work with multiple JSON documents in separate tabs
+- **Tab Management**: Create, rename, duplicate, and close tabs
+- **Import/Export**: Import JSON files and export individual tabs
+- **Keyboard Shortcuts**: 
+  - `Ctrl/Cmd + T`: New tab
+  - `Ctrl/Cmd + W`: Close current tab
+  - `Ctrl/Cmd + Tab`: Next tab
+  - `Ctrl/Cmd + Shift + Tab`: Previous tab
+  - `Ctrl/Cmd + 1-9`: Switch to specific tab
+- **Auto-save**: Tabs are automatically saved to localStorage
+
 ### 🌐 Internationalization
 
 - **Multi-language**: English and Korean support
