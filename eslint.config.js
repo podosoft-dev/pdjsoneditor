@@ -60,15 +60,35 @@ export default [
 	},
 	{
 		ignores: [
+			// Build output
 			'.svelte-kit/**',
 			'build/**',
 			'dist/**',
 			'node_modules/**',
+			// Test reports
+			'playwright-report/**',
+			'test-results/**',
+			'coverage/**',
+			// Config and generated files
+			'*.config.js',
+			'*.config.ts',
+			'.DS_Store',
+			'*.min.js',
+			// Temporary files
+			'*.tmp',
+			'*.log',
 			'.env',
 			'.env.*',
 			'!.env.example',
 			'vite.config.js.timestamp-*',
 			'vite.config.ts.timestamp-*',
+			// IDE
+			'.vscode/**',
+			'.idea/**',
+			// Documentation
+			'CLAUDE.md',
+			'*.md',
+			// Generated i18n files
 			'src/i18n/i18n-*.ts'
 		]
 	}

@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import JsonEditor from '$lib/components/JsonEditor.svelte';
 	import JsonGraph from '$lib/components/JsonGraph.svelte';
+	import TabBar from '$lib/components/TabBar.svelte';
+	import { tabsStore } from '$lib/stores/tabs.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -22,7 +24,8 @@
 		Plus,
 		Trash2,
 		X,
-		Copy
+		Copy,
+		RefreshCw
 	} from 'lucide-svelte';
 	import { mode, toggleMode } from 'mode-watcher';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
@@ -32,6 +35,7 @@
 	import { STORAGE_KEYS } from '$lib/constants';
 	import { requestJson, type HttpMethod } from '$lib/services/http';
 	import { logger } from '$lib/logger';
+	import { regenerateJSONValues, generateSampleJSON } from '$lib/utils/faker-generator';
 
 	// 	let jsonValue = $state(`{
 	//   "name": "John Doe",
@@ -66,52 +70,75 @@
 	//   }
 	// }`);
 
-	let jsonValue = $state(`{
-	"id": "0001",
-	"type": "donut",
-	"name": "Cake",
-	"ppu": 0.55,
-	"batters":
-		{
-			"batter":
-				[
-					{ "id": "1001", "type": "Regular" },
-					{ "id": "1002", "type": "Chocolate" },
-					{ "id": "1003", "type": "Blueberry" },
-					{ "id": "1004", "type": "Devil's Food" }
-				]
-		},
-	"topping":
-		[
-			{ "id": "5001", "type": "None" },
-			{ "id": "5002", "type": "Glazed" },
-			{ "id": "5005", "type": "Sugar" },
-			{ "id": "5007", "type": "Powdered Sugar" },
-			{ "id": "5006", "type": "Chocolate with Sprinkles" },
-			{ "id": "5003", "type": "Chocolate" },
-			{ "id": "5004", "type": "Maple" }
-		]
-}`);
+	// Get active tab's JSON value (not used directly, kept for reference)
+	// let jsonValue = $derived(tabsStore.getActiveTab()?.jsonContent || '');
+
+	// Create a local state for the editor that syncs with the active tab
+	let editorValue = $state('');
+
+	// Update editor value when tab changes
+	$effect(() => {
+		const activeTab = tabsStore.getActiveTab();
+		if (activeTab) {
+			editorValue = activeTab.jsonContent;
+			// Use cached parsed JSON if available for instant switching
+			if (activeTab.parsedJson !== undefined) {
+				parsedJson = activeTab.parsedJson as JsonValue;
+				error = activeTab.parsedJson ? '' : $LL.editor.invalidJson();
+			} else {
+				// Parse if not cached
+				try {
+					parsedJson = JSON.parse(activeTab.jsonContent);
+					error = '';
+				} catch (e) {
+					error = e instanceof Error ? e.message : $LL.editor.invalidJson();
+					parsedJson = null;
+				}
+			}
+		}
+	});
+
+	// Update tab content when editor changes
+	$effect(() => {
+		const activeTab = tabsStore.getActiveTab();
+		if (activeTab && editorValue !== activeTab.jsonContent) {
+			tabsStore.updateActiveTabContent(editorValue);
+		}
+	});
 
 	let parsedJson = $state<JsonValue | null>(null);
 	let error = $state<string>('');
-	let editorRef: JsonEditor;
+	let editorRef = $state<JsonEditor | null>(null);
 	let parseTimeout: ReturnType<typeof setTimeout>;
 
 	// LocalStorage keys are centralized in $lib/constants
 
-	// Initialize with empty values (will be populated from localStorage in onMount)
-	let urlInput = $state<string>('https://jsonplaceholder.typicode.com/todos/1');
+	// Local state for URL input (for two-way binding)
+	let urlInputLocal = $state<string>('');
+
+	// Get current tab's request settings (derived)
+	let httpMethod = $derived(tabsStore.getActiveTab()?.requestSettings?.method || 'GET');
+	let customHeaders = $derived(tabsStore.getActiveTab()?.requestSettings?.headers || []);
+	let customBody = $derived(tabsStore.getActiveTab()?.requestSettings?.body || '');
+	let sendAsRawText = $derived(tabsStore.getActiveTab()?.requestSettings?.sendAsRawText || false);
+	let useEditorContent = $derived(
+		tabsStore.getActiveTab()?.requestSettings?.useEditorContent || false
+	);
+
+	// Sync local URL input with tab's URL
+	$effect(() => {
+		const tabUrl =
+			tabsStore.getActiveTab()?.requestSettings?.url ||
+			'https://jsonplaceholder.typicode.com/todos/1';
+		urlInputLocal = tabUrl;
+	});
+
+	// UI state (not tab-specific)
 	let isLoading = $state<boolean>(false);
-	let httpMethod = $state<string>('GET');
 	let isDialogOpen = $state<boolean>(false);
-	let customHeaders = $state<Array<{ key: string; value: string }>>([]);
 	let tempHeaders = $state<Array<{ key: string; value: string }>>([]);
-	let customBody = $state<string>('');
 	let tempBody = $state<string>('');
-	let sendAsRawText = $state<boolean>(false);
 	let tempSendAsRawText = $state<boolean>(false);
-	let useEditorContent = $state<boolean>(false);
 	let tempUseEditorContent = $state<boolean>(false);
 	let httpStatusCode = $state<number | null>(null);
 	let responseTime = $state<number | null>(null);
@@ -135,17 +162,13 @@
 	}
 
 	function saveSettings() {
-		// Save temp to actual
-		customHeaders = [...tempHeaders];
-		customBody = tempBody;
-		sendAsRawText = tempSendAsRawText;
-		useEditorContent = tempUseEditorContent;
-
-		// Save to localStorage
-		localStorage.setItem(STORAGE_KEYS.HEADERS, JSON.stringify(customHeaders));
-		localStorage.setItem(STORAGE_KEYS.BODY, customBody);
-		localStorage.setItem(STORAGE_KEYS.RAW_BODY_MODE, JSON.stringify(sendAsRawText));
-		localStorage.setItem(STORAGE_KEYS.USE_EDITOR_CONTENT, JSON.stringify(useEditorContent));
+		// Save to active tab
+		tabsStore.updateActiveTabRequestSettings({
+			headers: [...tempHeaders],
+			body: tempBody,
+			sendAsRawText: tempSendAsRawText,
+			useEditorContent: tempUseEditorContent
+		});
 
 		isDialogOpen = false;
 	}
@@ -166,13 +189,15 @@
 				localStorage.removeItem(key);
 			});
 
-			// Reset all values to defaults
-			urlInput = 'https://jsonplaceholder.typicode.com/todos/1';
-			httpMethod = 'GET';
-			customHeaders = [];
-			customBody = '';
-			sendAsRawText = false;
-			useEditorContent = false;
+			// Reset tab's request settings to defaults
+			tabsStore.updateActiveTabRequestSettings({
+				url: 'https://jsonplaceholder.typicode.com/todos/1',
+				method: 'GET',
+				headers: [],
+				body: '',
+				sendAsRawText: false,
+				useEditorContent: false
+			});
 			httpStatusCode = null;
 			responseTime = null;
 			error = '';
@@ -183,8 +208,8 @@
 			tempSendAsRawText = false;
 			tempUseEditorContent = false;
 
-			// Save reset URL and method to localStorage
-			saveUrlAndMethod();
+			// Close dialog
+			isDialogOpen = false;
 		}
 	}
 
@@ -202,26 +227,37 @@
 		);
 	}
 
-	function saveUrlAndMethod() {
-		localStorage.setItem(STORAGE_KEYS.URL, urlInput);
-		localStorage.setItem(STORAGE_KEYS.METHOD, httpMethod);
+	function saveUrlAndMethod(url?: string, method?: string) {
+		const activeTab = tabsStore.getActiveTab();
+		if (!activeTab) return;
+
+		tabsStore.updateActiveTabRequestSettings({
+			url: url ?? activeTab.requestSettings?.url ?? '',
+			method: method ?? activeTab.requestSettings?.method ?? 'GET'
+		});
 	}
 
 	function clearJson() {
-		jsonValue = '';
+		const activeTab = tabsStore.getActiveTab();
+		if (activeTab) {
+			tabsStore.updateActiveTabContent('');
+			// Update local state immediately
+			editorValue = '';
+			parsedJson = null;
+		}
 		error = '';
 	}
 
 	async function copyJson() {
 		try {
-			await navigator.clipboard.writeText(jsonValue);
+			await navigator.clipboard.writeText(editorValue);
 			toast.success($LL.header.copySuccess());
 		} catch (e) {
 			logger.error('Failed to copy to clipboard:', e);
 			// Fallback for older browsers
 			try {
 				const textArea = document.createElement('textarea');
-				textArea.value = jsonValue;
+				textArea.value = editorValue;
 				document.body.appendChild(textArea);
 				textArea.focus();
 				textArea.select();
@@ -237,9 +273,16 @@
 
 	function formatJson() {
 		try {
-			const parsed = JSON.parse(jsonValue);
-			jsonValue = JSON.stringify(parsed, null, 2);
-			error = '';
+			const activeTab = tabsStore.getActiveTab();
+			if (activeTab) {
+				const parsed = JSON.parse(activeTab.jsonContent);
+				const formatted = JSON.stringify(parsed, null, 2);
+				tabsStore.updateActiveTabContent(formatted);
+				// Update local state immediately
+				editorValue = formatted;
+				parsedJson = parsed;
+				error = '';
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : $LL.editor.invalidJson();
 		}
@@ -247,19 +290,65 @@
 
 	function minifyJson() {
 		try {
-			const parsed = JSON.parse(jsonValue);
-			jsonValue = JSON.stringify(parsed);
-			error = '';
+			const activeTab = tabsStore.getActiveTab();
+			if (activeTab) {
+				const parsed = JSON.parse(activeTab.jsonContent);
+				const minified = JSON.stringify(parsed);
+				tabsStore.updateActiveTabContent(minified);
+				// Update local state immediately
+				editorValue = minified;
+				parsedJson = parsed;
+				error = '';
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : $LL.editor.invalidJson();
 		}
 	}
 
+	function regenerateValues() {
+		try {
+			const activeTab = tabsStore.getActiveTab();
+			if (activeTab) {
+				let regenerated;
+
+				// Check if current JSON is empty or invalid
+				if (!activeTab.jsonContent || activeTab.jsonContent.trim() === '') {
+					// Generate new sample JSON
+					regenerated = generateSampleJSON();
+				} else {
+					try {
+						// Try to parse existing JSON
+						const parsed = JSON.parse(activeTab.jsonContent);
+						// Regenerate values while preserving structure
+						regenerated = regenerateJSONValues(parsed);
+					} catch {
+						// If parsing fails, generate new sample JSON
+						regenerated = generateSampleJSON();
+					}
+				}
+
+				const formatted = JSON.stringify(regenerated, null, 2);
+				tabsStore.updateActiveTabContent(formatted);
+				// Update local state immediately
+				editorValue = formatted;
+				parsedJson = regenerated as JsonValue;
+				error = '';
+				toast.success($LL.editor.regenerateSuccess());
+			}
+		} catch (e) {
+			logger.error('Failed to regenerate JSON values:', e);
+			toast.error($LL.editor.invalidJson());
+		}
+	}
+
 	async function fetchJsonFromUrl() {
-		if (!urlInput.trim()) {
+		if (!urlInputLocal.trim()) {
 			error = $LL.editor.urlRequired();
 			return;
 		}
+
+		// Save the URL before fetching
+		saveUrlAndMethod(urlInputLocal, undefined);
 
 		isLoading = true;
 		// Only clear error if it's a fetch-related error
@@ -279,9 +368,9 @@
 			const startTime = performance.now();
 			const res = await requestJson({
 				method: httpMethod as HttpMethod,
-				url: urlInput,
+				url: urlInputLocal,
 				headers: customHeaders,
-				editorJson: jsonValue,
+				editorJson: editorValue,
 				customBody,
 				sendAsRawText,
 				useEditorContent,
@@ -292,17 +381,24 @@
 			httpStatusCode = res.status;
 
 			if (res.data !== undefined) {
-				jsonValue = JSON.stringify(res.data, null, 2);
+				const formattedJson = JSON.stringify(res.data, null, 2);
+				tabsStore.updateActiveTabContent(formattedJson);
+				// Also update the local parsed JSON immediately
+				parsedJson = res.data as JsonValue;
 			} else if (res.rawText !== undefined) {
-				// Non-JSON 응답은 텍스트로 보여줌
-				jsonValue = JSON.stringify({ response: res.rawText }, null, 2);
+				// Non-JSON response shown as text
+				const responseObj = { response: res.rawText };
+				const formattedJson = JSON.stringify(responseObj, null, 2);
+				tabsStore.updateActiveTabContent(formattedJson);
+				// Also update the local parsed JSON immediately
+				parsedJson = responseObj as JsonValue;
 			}
 
 			if (res.ok && error && (error.includes('fetch') || error.includes('HTTP'))) {
 				error = '';
 			}
 		} catch (e) {
-			if ((e as any)?.name === 'AbortError') {
+			if ((e as Error)?.name === 'AbortError') {
 				// silently ignore aborted request
 				return;
 			}
@@ -327,16 +423,15 @@
 	}
 
 	function handleUrlBlur() {
-		saveUrlAndMethod();
+		saveUrlAndMethod(urlInputLocal, undefined);
 	}
 
 	function handleMethodChange(newMethod: string) {
-		httpMethod = newMethod;
-		saveUrlAndMethod();
+		saveUrlAndMethod(undefined, newMethod);
 	}
 
 	$effect(() => {
-		const currentJsonValue = jsonValue;
+		const currentJsonValue = editorValue;
 		// console.log('[Page Effect] JSON value changed, length:', currentJsonValue.length);
 
 		// Clear previous timeout
@@ -353,9 +448,21 @@
 				mod.graphLoading.set({ active: true, phase: 'build', progress: 0 });
 				parsedJson = JSON.parse(currentJsonValue);
 				error = '';
+
+				// Update cached parsed JSON in the active tab
+				const activeTab = tabsStore.getActiveTab();
+				if (activeTab) {
+					activeTab.parsedJson = parsedJson;
+				}
 			} catch (e) {
 				error = e instanceof Error ? e.message : $LL.editor.invalidJson();
 				parsedJson = null;
+
+				// Update cached parsed JSON in the active tab
+				const activeTab = tabsStore.getActiveTab();
+				if (activeTab) {
+					activeTab.parsedJson = null;
+				}
 			}
 		}, 500);
 
@@ -367,62 +474,6 @@
 	});
 
 	onMount(() => {
-		// Load saved values from localStorage
-		const savedUrl = localStorage.getItem(STORAGE_KEYS.URL);
-		const savedMethod = localStorage.getItem(STORAGE_KEYS.METHOD);
-		const savedHeaders = localStorage.getItem(STORAGE_KEYS.HEADERS);
-		const savedBody = localStorage.getItem(STORAGE_KEYS.BODY);
-		const savedRawBodyMode = localStorage.getItem(STORAGE_KEYS.RAW_BODY_MODE);
-		const savedUseEditorContent = localStorage.getItem(STORAGE_KEYS.USE_EDITOR_CONTENT);
-
-		if (savedUrl) {
-			urlInput = savedUrl;
-		}
-		if (savedMethod && httpMethods.includes(savedMethod as any)) {
-			httpMethod = savedMethod;
-		}
-		if (savedHeaders) {
-			try {
-				const parsed = JSON.parse(savedHeaders);
-				if (Array.isArray(parsed) && parsed.length > 0) {
-					// Ensure it's a proper array assignment
-					customHeaders = [...parsed];
-				} else {
-					// Keep empty if no headers saved
-					customHeaders = [];
-				}
-			} catch (e) {
-				logger.error('Failed to parse saved headers:', e);
-				// Keep empty on error
-				customHeaders = [];
-			}
-		} else {
-			// Keep empty if nothing saved
-			customHeaders = [];
-		}
-
-		if (savedBody !== null && savedBody !== undefined && savedBody !== '') {
-			customBody = savedBody;
-		}
-
-		if (savedRawBodyMode !== null) {
-			try {
-				sendAsRawText = JSON.parse(savedRawBodyMode);
-			} catch (e) {
-				logger.error('Failed to parse saved raw body mode:', e);
-				sendAsRawText = false;
-			}
-		}
-
-		if (savedUseEditorContent !== null) {
-			try {
-				useEditorContent = JSON.parse(savedUseEditorContent);
-			} catch (e) {
-				logger.error('Failed to parse saved use editor content:', e);
-				useEditorContent = false;
-			}
-		}
-
 		const handleNodeClick = (e: CustomEvent) => {
 			const path = e.detail;
 			if (path && editorRef) {
@@ -430,10 +481,34 @@
 			}
 		};
 
+		const handleTabChanged = () => {
+			// Force re-render of graph when tab changes
+			const activeTab = tabsStore.getActiveTab();
+			if (activeTab) {
+				editorValue = activeTab.jsonContent;
+				// Use cached parsed JSON if available for instant switching
+				if (activeTab.parsedJson !== undefined) {
+					parsedJson = activeTab.parsedJson as JsonValue;
+					error = activeTab.parsedJson ? '' : $LL.editor.invalidJson();
+				} else {
+					// Parse if not cached
+					try {
+						parsedJson = JSON.parse(activeTab.jsonContent);
+						error = '';
+					} catch (e) {
+						error = e instanceof Error ? e.message : $LL.editor.invalidJson();
+						parsedJson = null;
+					}
+				}
+			}
+		};
+
 		window.addEventListener('nodeClick', handleNodeClick as EventListener);
+		window.addEventListener('tabChanged', handleTabChanged as EventListener);
 
 		return () => {
 			window.removeEventListener('nodeClick', handleNodeClick as EventListener);
+			window.removeEventListener('tabChanged', handleTabChanged as EventListener);
 		};
 	});
 </script>
@@ -454,17 +529,20 @@
 		</div>
 	</header>
 
+	<!-- Tab Bar -->
+	<TabBar />
+
 	<Resizable.PaneGroup direction="horizontal" class="flex-1">
 		<Resizable.Pane defaultSize={30} minSize={20}>
 			<div class="h-full flex flex-col overflow-hidden">
 				<div class="flex flex-col border-b bg-muted/50">
 					<div class="h-8 flex items-center px-2 flex-shrink-0 gap-1">
 						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
-								<Button variant="outline" size="sm" class="h-7 px-2 text-xs gap-1">
-									{httpMethod}
-									<ChevronDown class="h-3 w-3" />
-								</Button>
+							<DropdownMenu.Trigger
+								class="inline-flex items-center justify-center h-7 px-2 text-xs gap-1 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+							>
+								{httpMethod}
+								<ChevronDown class="h-3 w-3" />
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content align="start">
 								{#each httpMethods as method}
@@ -483,7 +561,7 @@
 						<Input
 							type="url"
 							placeholder={$LL.editor.urlPlaceholder()}
-							bind:value={urlInput}
+							bind:value={urlInputLocal}
 							onkeydown={handleUrlKeydown}
 							onblur={handleUrlBlur}
 							class="h-7 text-xs flex-1"
@@ -552,10 +630,22 @@
 							<Minimize2 class="w-3 h-3" />
 							{$LL.header.minify()}
 						</Button>
+						<Button
+							size="sm"
+							variant="ghost"
+							onclick={regenerateValues}
+							class="h-7 px-2 text-sm flex items-center gap-1"
+							title={$LL.editor.regenerateTooltip()}
+						>
+							<RefreshCw class="w-3 h-3" />
+							{$LL.editor.regenerate()}
+						</Button>
 					</div>
 				</div>
 				<div class="flex-1 overflow-hidden">
-					<JsonEditor bind:value={jsonValue} bind:this={editorRef} class="h-full w-full" />
+					{#key tabsStore.activeTabId}
+						<JsonEditor bind:value={editorValue} bind:this={editorRef} class="h-full w-full" />
+					{/key}
 				</div>
 			</div>
 		</Resizable.Pane>
@@ -565,13 +655,15 @@
 		<Resizable.Pane defaultSize={50} minSize={20}>
 			<div class="h-full flex flex-col overflow-hidden">
 				<div class="flex-1 overflow-hidden">
-					{#if parsedJson}
-						<JsonGraph jsonData={parsedJson} jsonString={jsonValue} class="h-full" />
-					{:else}
-						<div class="h-full flex items-center justify-center text-muted-foreground">
-							{$LL.editor.placeholder()}
-						</div>
-					{/if}
+					{#key tabsStore.activeTabId}
+						{#if parsedJson}
+							<JsonGraph jsonData={parsedJson} jsonString={editorValue} class="h-full" />
+						{:else}
+							<div class="h-full flex items-center justify-center text-muted-foreground">
+								{$LL.editor.placeholder()}
+							</div>
+						{/if}
+					{/key}
 				</div>
 			</div>
 		</Resizable.Pane>

@@ -192,7 +192,7 @@
 
 	async function performLayoutWithWorker(): Promise<void> {
 		// Instantiate bundled worker via Vite's ?worker plugin
-		const worker: Worker = new (GraphLayoutWorker as any)();
+		const worker: Worker = new (GraphLayoutWorker as unknown as new () => Worker)();
 		const LARGE_GRAPH_NODE_THRESHOLD = 400;
 		const isLarge = tempNodes.length >= LARGE_GRAPH_NODE_THRESHOLD;
 		const cfg = {
@@ -213,16 +213,27 @@
 
 		return new Promise((resolve, reject) => {
 			worker.onmessage = (e: MessageEvent) => {
-				const data: any = e.data;
+				const data = e.data as {
+					type: string;
+					nodes?: Node[];
+					edges?: Edge[];
+					progress?: number;
+					message?: string;
+					phase?: 'build' | 'layout' | 'finalize';
+				};
 				if (data.type === 'progress') {
 					// Stop fake progress when real progress starts arriving
 					if (fakeProgressTimer) {
 						clearInterval(fakeProgressTimer);
 						fakeProgressTimer = null;
 					}
-					graphLoading.set({ active: true, phase: data.phase, progress: data.progress });
+					graphLoading.set({
+						active: true,
+						phase: data.phase || 'build',
+						progress: data.progress || 0
+					});
 				} else if (data.type === 'done') {
-					tempNodes = data.nodes;
+					tempNodes = data.nodes || [];
 					graphLoading.set({ active: true, phase: 'finalize', progress: 1 });
 					worker.terminate();
 					resolve();
@@ -333,7 +344,7 @@
 	function getJsonAtPath(root: JsonValue, pathStr: string): JsonValue | null {
 		if (!pathStr) return root;
 		const parts = pathStr.split('.').filter(Boolean);
-		let cur: any = root as any;
+		let cur = root as JsonValue;
 		for (const p of parts) {
 			if (cur == null) return null;
 			if (Array.isArray(cur)) {
@@ -341,7 +352,7 @@
 				if (Number.isNaN(idx)) return null;
 				cur = cur[idx];
 			} else if (typeof cur === 'object') {
-				cur = (cur as any)[p];
+				cur = (cur as Record<string, JsonValue>)[p];
 			} else {
 				return null;
 			}
@@ -372,36 +383,46 @@
 		tempNodes = [];
 		tempEdges = [];
 
-		refItems.forEach((refItem: any, idx: number) => {
-			const visible = nodeShowsAll || idx < LAYOUT_CONFIG.MAX_DISPLAY_ITEMS;
-			const referenceKey = `${parentId}-${refItem.key}`;
-			const isRefExpanded = expandedReferences.has(referenceKey) || true; // default expanded
-			if (!visible || !isRefExpanded) return;
-			const childId: string = refItem.targetNodeId || `node-${++nodeId}`;
-			const childPath = parentPath ? `${parentPath}.${refItem.key}` : refItem.key;
-			const childJson = getJsonAtPath(jsonData as JsonValue, childPath);
-			// Build subtree starting from this child
-			createCompactGraph(
-				childJson as JsonValue,
-				parentId,
-				refItem.key,
-				0,
-				parentPath ? parentPath.split('.') : [],
-				true,
-				childId
-			);
-			// Connect parent to child with reference edge
-			tempEdges.push({
-				id: `edge-${parentId}-${refItem.key}-${childId}`,
-				source: parentId,
-				sourceHandle: `${parentId}-${refItem.key}`,
-				target: childId,
-				type: 'bezier',
-				animated: false,
-				style: 'stroke: #9ca3af; stroke-width: 1'
-			} as any);
-			expandedReferences.add(referenceKey);
-		});
+		refItems.forEach(
+			(
+				refItem: {
+					key: string;
+					value: JsonValue;
+					isReferenceExpanded?: boolean;
+					targetNodeId?: string;
+				},
+				idx: number
+			) => {
+				const visible = nodeShowsAll || idx < LAYOUT_CONFIG.MAX_DISPLAY_ITEMS;
+				const referenceKey = `${parentId}-${refItem.key}`;
+				const isRefExpanded = expandedReferences.has(referenceKey) || true; // default expanded
+				if (!visible || !isRefExpanded) return;
+				const childId: string = refItem.targetNodeId || `node-${++nodeId}`;
+				const childPath = parentPath ? `${parentPath}.${refItem.key}` : refItem.key;
+				const childJson = getJsonAtPath(jsonData as JsonValue, childPath);
+				// Build subtree starting from this child
+				createCompactGraph(
+					childJson as JsonValue,
+					parentId,
+					refItem.key,
+					0,
+					parentPath ? parentPath.split('.') : [],
+					true,
+					childId
+				);
+				// Connect parent to child with reference edge
+				tempEdges.push({
+					id: `edge-${parentId}-${refItem.key}-${childId}`,
+					source: parentId,
+					sourceHandle: `${parentId}-${refItem.key}`,
+					target: childId,
+					type: 'bezier',
+					animated: false,
+					style: 'stroke: #9ca3af; stroke-width: 1'
+				} as Edge);
+				expandedReferences.add(referenceKey);
+			}
+		);
 
 		// Merge new nodes/edges
 		if (tempNodes.length > 0) {

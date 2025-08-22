@@ -143,6 +143,18 @@ type RootTranslation = {
 		 * S​a​v​e
 		 */
 		save: string;
+		/**
+		 * R​e​g​e​n​e​r​a​t​e
+		 */
+		regenerate: string;
+		/**
+		 * R​e​g​e​n​e​r​a​t​e​ ​v​a​l​u​e​s​ ​w​h​i​l​e​ ​p​r​e​s​e​r​v​i​n​g​ ​J​S​O​N​ ​s​t​r​u​c​t​u​r​e
+		 */
+		regenerateTooltip: string;
+		/**
+		 * J​S​O​N​ ​v​a​l​u​e​s​ ​r​e​g​e​n​e​r​a​t​e​d​ ​s​u​c​c​e​s​s​f​u​l​l​y
+		 */
+		regenerateSuccess: string;
 	};
 	graph: {
 		/**
@@ -186,6 +198,36 @@ type RootTranslation = {
 		 * R​e​a​d​y
 		 */
 		ready: string;
+	};
+	tabs: {
+		/**
+		 * R​e​n​a​m​e
+		 */
+		rename: string;
+		/**
+		 * D​u​p​l​i​c​a​t​e
+		 */
+		duplicate: string;
+		/**
+		 * E​x​p​o​r​t​ ​J​S​O​N
+		 */
+		exportJson: string;
+		/**
+		 * C​l​o​s​e​ ​T​a​b
+		 */
+		closeTab: string;
+		/**
+		 * I​m​p​o​r​t​ ​J​S​O​N​ ​F​i​l​e
+		 */
+		importJsonFile: string;
+		/**
+		 * N​e​w​ ​T​a​b
+		 */
+		newTab: string;
+		/**
+		 * I​m​p​o​r​t
+		 */
+		import: string;
 	};
 };
 
@@ -317,6 +359,18 @@ export type TranslationFunctions = {
 		 * Save
 		 */
 		save: () => LocalizedString;
+		/**
+		 * Regenerate
+		 */
+		regenerate: () => LocalizedString;
+		/**
+		 * Regenerate values while preserving JSON structure
+		 */
+		regenerateTooltip: () => LocalizedString;
+		/**
+		 * JSON values regenerated successfully
+		 */
+		regenerateSuccess: () => LocalizedString;
 	};
 	graph: {
 		/**
@@ -359,6 +413,36 @@ export type TranslationFunctions = {
 		 * Ready
 		 */
 		ready: () => LocalizedString;
+	};
+	tabs: {
+		/**
+		 * Rename
+		 */
+		rename: () => LocalizedString;
+		/**
+		 * Duplicate
+		 */
+		duplicate: () => LocalizedString;
+		/**
+		 * Export JSON
+		 */
+		exportJson: () => LocalizedString;
+		/**
+		 * Close Tab
+		 */
+		closeTab: () => LocalizedString;
+		/**
+		 * Import JSON File
+		 */
+		importJsonFile: () => LocalizedString;
+		/**
+		 * New Tab
+		 */
+		newTab: () => LocalizedString;
+		/**
+		 * Import
+		 */
+		import: () => LocalizedString;
 	};
 };
 

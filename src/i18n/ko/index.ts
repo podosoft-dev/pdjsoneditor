@@ -34,7 +34,10 @@ const ko: Translation = {
 		clearAll: '모두 지우기',
 		clearAllConfirm: '모든 설정을 지우시겠습니까? 저장된 헤더, 본문, URL이 모두 삭제됩니다.',
 		cancel: '취소',
-		save: '저장'
+		save: '저장',
+		regenerate: '재생성',
+		regenerateTooltip: 'JSON 구조를 유지하면서 값만 재생성',
+		regenerateSuccess: 'JSON 값이 성공적으로 재생성되었습니다'
 	},
 	graph: {
 		showMore: '{count} 개 더 보기',
@@ -50,6 +53,15 @@ const ko: Translation = {
 	},
 	footer: {
 		ready: '준비됨'
+	},
+	tabs: {
+		rename: '이름 변경',
+		duplicate: '복제',
+		exportJson: 'JSON 내보내기',
+		closeTab: '탭 닫기',
+		importJsonFile: 'JSON 파일 가져오기',
+		newTab: '새 탭',
+		import: '가져오기'
 	}
 } satisfies Translation;
 

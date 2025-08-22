@@ -4,6 +4,7 @@
 	import { EditorState } from '@codemirror/state';
 	import { json } from '@codemirror/lang-json';
 	import { syntaxTree } from '@codemirror/language';
+	import type { TreeCursor } from '@lezer/common';
 	import { oneDark } from '@codemirror/theme-one-dark';
 	import { mode } from 'mode-watcher';
 	import { logger } from '$lib/logger';
@@ -26,7 +27,7 @@
 		}
 
 		// Recursive function to traverse with path context
-		function traverse(cursor: any, path: string[] = []) {
+		function traverse(cursor: TreeCursor, path: string[] = []) {
 			do {
 				const nodeName = cursor.name;
 

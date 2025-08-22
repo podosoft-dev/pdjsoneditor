@@ -52,11 +52,11 @@ export async function requestJson(opts: RequestJsonOptions): Promise<RequestJson
 		const bodyContent = (useEditorContent ? editorJson : customBody).trim();
 		if (bodyContent) {
 			if (sendAsRawText) {
-				(init as any).body = bodyContent;
+				init.body = bodyContent;
 			} else {
 				// Ensure JSON body is valid and set proper content-type
 				const parsed = JSON.parse(bodyContent);
-				(init as any).body = JSON.stringify(parsed);
+				init.body = JSON.stringify(parsed);
 				// Upsert Content-Type to application/json
 				const hasCT = Object.keys(headers).some((k) => k.toLowerCase() === 'content-type');
 				if (hasCT) {
