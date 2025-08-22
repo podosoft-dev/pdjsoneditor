@@ -44,7 +44,7 @@ A powerful JSON visualization and editing tool built with SvelteKit and Svelte 5
 - **Multiple Documents**: Work with multiple JSON documents in separate tabs
 - **Tab Management**: Create, rename, duplicate, and close tabs
 - **Import/Export**: Import JSON files and export individual tabs
-- **Keyboard Shortcuts**: 
+- **Keyboard Shortcuts**:
   - `Ctrl/Cmd + T`: New tab
   - `Ctrl/Cmd + W`: Close current tab
   - `Ctrl/Cmd + Tab`: Next tab
